@@ -1,4 +1,4 @@
-# FHIR 01 如何註冊 Smart On FHIR的沙盒Sandbox
+# FHIR 01 如何註冊 Smart On FHIR的沙盒 Sandbox
 
 由於最近接到一個任務，那就是要完成一個 Smart App應用程式並且要能夠通過 Smart On FHIR 的認證，最終要能夠上架到 Smart 市集上，因此，便有了這一系列的文章，將如何透過 .NET 相關技術，開發出存取 FHIR 醫療紀錄的應用程式開發過程的說明。
 
