@@ -182,4 +182,50 @@ protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool fir
 }
 ```
 
+* 這裡主要會進行：責處理 SMART on FHIR 啟動流程：保存啟動參數、取得 FHIR 伺服器元資料、產生授權 URL 並導向授權伺服器
+* `KeepLaunchIss()` 方法，保存 SMART on FHIR 啟動參數 (iss 和 launch), 從查詢字串中取得 iss (FHIR 伺服器 URL) 和 launch (啟動代碼) 參數並儲存到應用程式設定中
+* `GetMetadataAsync()` 方法，從 FHIR 伺服器取得元資料 (CapabilityStatement)，解析 SMART on FHIR 的 OAuth 端點 (authorize 和 token URL) 並儲存到應用程式設定中
+* 最後將會，回傳一個布林值，表示是否成功取得授權和令牌端點
+* `GetAuthorizeUrlAsync` 方法，產生 OAuth 授權 URL，建立 state 參數以防止 CSRF 攻擊，將應用程式設定儲存到狀態存儲中，並組合完整的授權 URL，包含必要的 OAuth 參數：response_type、client_id、redirect_uri、scope、state、launch 和 aud
+* 最後將會，將瀏覽器導向到授權伺服器 URL，開始授權流程
+
+### GetMetadataAsync() 方法說明
+
+`GetMetadataAsync()` 方法主要做三件事：
+
+* 連接 FHIR 伺服器 - 使用 `FhirClient` 向 FHIR 伺服器請求 `metadata` 端點，取得 `CapabilityStatement` (能力聲明)
+* 解析 OAuth 端點 - 在 `CapabilityStatement` 中尋找 SMART on FHIR 的 OAuth 擴充資訊 (`oauth-uris`)，提取出：
+   - `authorize` URL (授權端點)
+   - `token` URL (令牌端點)
+* 驗證並回傳結果 - 將這兩個 URL 儲存到 `SmartAppSettingService` 中，並檢查是否都成功取得。若兩者皆不為空則回傳 `true`，否則回傳 `false`
+* 簡單來說，這個方法負責從 FHIR 伺服器探索並取得 OAuth 認證所需的授權和令牌端點 URL。
+
+### GetAuthorizeUrlAsync() 方法說明
+
+`GetAuthorizeUrlAsync()` 方法主要做三件事：
+
+* 產生安全狀態碼 - 建立一個唯一的 `state` GUID 字串，用於防止 CSRF (跨站請求偽造) 攻擊
+* 儲存狀態 - 將應用程式的設定資料 (`SmartAppSettingModel`) 以 `state` 為鍵值存入 `OAuthStateStoreService`，保留 10 分鐘有效期限
+* 組合授權 URL - 建構完整的 OAuth 授權請求 URL，包含所有必要參數：
+   - `response_type=code` (授權碼流程)
+   - `client_id` (客戶端識別碼)
+   - `redirect_uri` (回調網址)
+   - `scope` (請求的權限範圍，如讀取病患資料)
+   - `state` (安全狀態碼)
+   - `launch` (SMART 啟動代碼)
+   - `aud` (目標 FHIR 伺服器 URL)
+* 簡單來說，這個方法負責產生並回傳一個完整的 OAuth 授權 URL，用於將使用者重新導向到 FHIR 授權伺服器進行身份驗證。
+* 對於要取得授權碼的 URL，將會使用底下的程式碼
+
+```csharp
+string launchUrl = $"{SmartAppSettingService.Data.AuthorizeUrl}?response_type=code" +
+    $"&client_id={SmartAppSettingService.Data.ClientId}" +
+    $"&redirect_uri={Uri.EscapeDataString(SmartAppSettingService.Data.RedirectUrl)}" +
+    $"&scope={Uri.EscapeDataString("openid fhirUser profile launch/patient patient/*.read patient/Encounter.read patient/MedicationRequest.read patient/ServiceRequest.read")}" +
+    $"&state={SmartAppSettingService.Data.State}" +
+    $"&launch={SmartAppSettingService.Data.Launch}" +
+    $"&aud={Uri.EscapeDataString(SmartAppSettingService.Data.FhirServerUrl)}";
+```
+
+* 取得到這個 URL 之後，將會使用 `NavigationManager.NavigateTo` 方法，導向到授權伺服器，進行身分驗證，並且取得授權碼
 
