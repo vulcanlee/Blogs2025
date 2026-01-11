@@ -1,5 +1,12 @@
 # FHIR 02 建立 EHR Launch App
 
+在前一篇 [FHIR 01 如何註冊 Smart On FHIR的沙盒 Sandbox
+](https://csharpkh.blogspot.com/2026/01/FHIR-01Smart-On-FHIR-Sandbox.html) 文章中，說明了如何註冊一個 Smart On FHIR 的沙盒 (Sandbox)。
+
+根據 Smart On FHIR 規格說明，在進行 EHR Launch 過程中，沙盒會啟動 Smart App，並且傳送兩個參數，Iss 與 Launch 兩個參數，到指定的端點內，這裡的啟動端點將會是 [https://localhost:7108/launch]，因此，需要設計這個頁面， 並且取得了 Iss 與 Launch 兩個參數，接著，透過 Iss 參數，便可以取得 FHIR Server 的 Meta 資訊，有了這個資訊，便可以取得授權伺服器的服務端點，另外，launch 參數，將會是 EHR 系統的 Context，這會需要再取得授權碼中用到。
+
+為了要完成 Smart On FHIR App 的開發，並且符合沙盒的要求，這篇文章將會示範如何建立一個 EHR Launch App 的專案，並且設計出能夠處理來自 EHR 系統啟動請求的頁面。這個 Smart App 做了相當簡單的效果，透過 Smart On FHIR 的規範，取得一個病患 ID，接著呼叫 FHIR API，取得該病患的姓名與身高、體重。
+
 # 建立 Blazor 專案
 * 開啟 Visual Studio 2026
 * 選擇「建立新專案」
