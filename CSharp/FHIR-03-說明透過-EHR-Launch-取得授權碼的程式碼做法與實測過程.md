@@ -30,19 +30,19 @@
 * 這個網址將會是 Sandbox 系統導向到我們的 EHR Launch 頁面的網址，從這裡也看到了兩個重要的參數：
   * `iss` ：代表 EHR 系統的 FHIR 伺服器位址 [https://thas.mohw.gov.tw/v/r4/fhir](https://thas.mohw.gov.tw/v/r4/fhir) ，這個將會是我們後續要與之互動的 FHIR 伺服器
   * `launch` ：代表這次啟動的 Launch 參數，也就是 EHR 的系統所產生的 Launch Context
-* 接著，系統會自動將我們的瀏覽器，重新導向到授權伺服器: `https://thas.mohw.gov.tw/v/r4/auth/authorize?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid%20fhirUser%20profile%20launch%2Fpatient%20patient%2F%2A.read%20patient%2FEncounter.read%20patient%2FMedicationRequest.read%20patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir`
+* 接著，系統會自動將我們的瀏覽器，重新導向到授權伺服器: `https://thas.mohw.gov.tw/v/r4/auth/authorize?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid%20fhirUser%20profile%20launch%2Fpatient%20patient%2F%2A.read%20patient%2FEncounter.read%20patient%2FMedicationRequest.read%20patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir`
 * 此時網頁畫面出會出現底下螢幕截圖，會有這樣的效果，是程式碼會暫停一段時間，故意讓使用者看到準備要切換到該網頁的畫面
 ![](../Images/cs2025-909.png)
-* 現在，將會進入到 Sand Box 的授權伺服器，要取得授權碼，當取得了授權碼之後，就會使用 redirect_uri 參數，重新導向回到我們開發的頁面端點 `https://localhost:7191/ExchangeToken` ，並且在網址列中帶入授權碼參數 code
-* 在網頁上，將會看到下面的畫面截圖，準備進入到身分驗證階段，此時的 URL 為： `https://thas.mohw.gov.tw/provider-login?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=ab81aeae4fe84986bcca1e51948fa824&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider`
+* 現在，將會進入到 Sand Box 的授權伺服器，要取得授權碼，當取得了授權碼之後，就會使用 redirect_uri 參數，重新導向回到我們開發的頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code
+* 在網頁上，將會看到下面的畫面截圖，準備進入到身分驗證階段，此時的 URL 為： `https://thas.mohw.gov.tw/provider-login?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=ab81aeae4fe84986bcca1e51948fa824&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider`
 ![](../Images/cs2025-908.png)
 * 在這裡使用預設的帳號與密碼，點選 [Login] 按鈕
-* 現在的畫面將會切換到選擇病患的畫面，此時的網址為： `https://thas.mohw.gov.tw/select-patient?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider&login_success=1&provider=147533`
+* 現在的畫面將會切換到選擇病患的畫面，此時的網址為： `https://thas.mohw.gov.tw/select-patient?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider&login_success=1&provider=147533`
 ![](../Images/cs2025-907.png)
 * 點選任一病患項目，準備進入到下一個階段
 * 可是，卻看到的底下畫面
 ![](../Images/cs2025-906.png)
-* 在此看到了 [無法連上這個網站] 的訊息，這是因為我們的 redirect_uri 端點 `https://localhost:7191/ExchangeToken?code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdGllbnQtVFdFTVItRE1TLTEyMzQ1Njc4OS1BMTIzNDU2Nzg5In0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxOTEvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MTI5MjYzLCJleHAiOjE3NjgxMjk1NjN9.yK4RJXRG34pjsdf53PhM6uiZnGOM89w0UdT6-8Wjd_8&state=15fb5f43e861447cbb482a399c4fe7ab` 
+* 在此看到了 [無法連上這個網站] 的訊息，這是因為我們的 redirect_uri 端點 `https://localhost:7108/ExchangeToken?code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdGllbnQtVFdFTVItRE1TLTEyMzQ1Njc4OS1BMTIzNDU2Nzg5In0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxOTEvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MTI5MjYzLCJleHAiOjE3NjgxMjk1NjN9.yK4RJXRG34pjsdf53PhM6uiZnGOM89w0UdT6-8Wjd_8&state=15fb5f43e861447cbb482a399c4fe7ab` 
 * 會有這樣的結果，是因為我們上為設計 [ExchangeToken] 頁面程式碼，才會看到這樣的結果導致的
 * 對於 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdGllbnQtVFdFTVItRE1TLTEyMzQ1Njc4OS1BMTIzNDU2Nzg5In0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxOTEvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MTI5MjYzLCJleHAiOjE3NjgxMjk1NjN9.yK4RJXRG34pjsdf53PhM6uiZnGOM89w0UdT6-8Wjd_8` 則是授權碼
 * 這個授權碼是以 JWT 格式所編碼的字串
@@ -55,7 +55,7 @@
     "patient": "patient-TWEMR-DMS-123456789-A123456789"
   },
   "client_id": "smart-app",
-  "redirect_uri": "https://localhost:7191/ExchangeToken",
+  "redirect_uri": "https://localhost:7108/ExchangeToken",
   "scope": "openid fhirUser profile launch/patient patient/*.read patient/Encounter.read patient/MedicationRequest.read patient/ServiceRequest.read",
   "pkce": "auto",
   "client_type": "public",
@@ -95,7 +95,7 @@ builder.Services.Configure<SettingModel>(builder.Configuration
   "AllowedHosts": "*",
   "SmartAppSetting": {
     "FhirServerUrl": "https://thas.mohw.gov.tw/v/r4/fhir",
-    "RedirectUrl": "https://localhost:7191/ExchangeToken",
+    "RedirectUrl": "https://localhost:7108/ExchangeToken",
     "ClientId": "smart-app"
   }
 }
