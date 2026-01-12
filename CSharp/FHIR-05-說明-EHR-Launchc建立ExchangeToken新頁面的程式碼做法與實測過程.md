@@ -1,14 +1,7 @@
-# FHIR 04 在 EHR Launchc 建立新頁面來接收授權碼進而取得存取權杖並呼叫 FHIR API
+# FHIR 05 說明 EHR Launchc 建立 ExchangeToken 新頁面的程式碼做法與實測過程
 
 在上一篇文章中 [FHIR 03 說明透過 EHR Launch 取得授權碼的程式碼做法與實測過程
 ](https://csharpkh.blogspot.com/2026/01/FHIR-03--EHR-Launch-.html)  ，我們已經成功地透過 EHR Launch 流程取得了授權碼 (Authorization Code) 。
-
-根據 Smart On FHIR 規格文件說明內容，我們接下來要做的工作是：
-1. 建立一個新的頁面 (Razor Page) 來接收授權碼
-2. 在這個頁面中，使用授權碼來交換取得存取權杖 (Access Token)
-3. 使用取得的存取權杖來呼叫 FHIR API 以讀取病患資料
-
-為了要完成這些需求，需要額外再增加一個頁面、讀取存取權杖用的資料模型、解析JWT內容，用來取出指定的病患ID與呼叫 FHIR Server API的程式碼。
 
 ## 建立 SmartResponse 資料模型
 
