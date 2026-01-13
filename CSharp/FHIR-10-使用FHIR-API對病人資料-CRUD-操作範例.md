@@ -346,3 +346,68 @@ private const string FhirBaseUrl = "https://hapi.fhir.org/baseR4";
 * 這個方法會發送一個 HTTP POST 請求到 FHIR 伺服器的 /Patient 端點，並將 Patient 物件序列化為 JSON 格式的請求主體
 * 當伺服器成功處理請求後，會回傳一個包含新建立的 Patient 資源的回應
 * 回傳的 Patient 物件會包含伺服器分配的唯一識別碼（ID）與版本資訊（VersionId）
+* 顯示該 Patient 的 ID & 版本資訊
+
+## 查詢
+
+* 在新增 Patient 之後，可以使用其 ID 來查詢該病人的資料
+* 使用 `await client.ReadAsync<Patient>($"Patient/{created.Id}");` 方法來根據剛剛建立的 Patient ID 來查詢該病人資料
+* 這個方法會發送一個 HTTP GET 請求到 FHIR 伺服器的 /Patient/{id} 端點
+* 當伺服器成功處理請求後，會回傳一個包含該 Patient 資源的回應
+* 一旦取得了 Patient 之後，就會在螢幕上顯示該 Patient 的姓名與活躍狀態
+
+## 修改
+
+* 查詢到 Patient 之後，可以對其進行修改
+* 這裡的範例是將 Patient 的 Active 屬性設為 false，並新增一個 Email 聯絡方式
+* 在此，將會使用底下程式碼來修改 Patient 物件的屬性
+
+```csharp
+readBack.Active = false;
+readBack.Telecom.Add(new ContactPoint(ContactPoint.ContactPointSystem.Email, null, $"{GivenName}.{FamilynName}@example.org"));
+```
+
+* 使用 `await client.UpdateAsync(readBack);` 方法來將修改後的 Patient 物件更新到 FHIR 伺服器
+* 這個方法會發送一個 HTTP PUT 請求到 FHIR 伺服器的 /Patient/{id} 端點，並將修改後的 Patient 物件序列化為 JSON 格式的請求主體
+* 當伺服器成功處理請求後，會回傳一個包含更新後的 Patient 資源的回應
+* 顯示更新後的 Patient 版本資訊與聯絡方式
+
+## 搜尋
+
+* 所謂的搜尋，是指根據特定條件來查找符合條件的資源。在這個範例中，我們將使用 Patient 的 Identifier 來進行搜尋。
+* 使用底下的程式碼來進行搜尋條件的設定
+
+```csharp
+var bundle = await client.SearchAsync<Patient>(new string[]
+{
+    $"identifier={identityValue}",
+    "_count=5"
+}); // GET /Patient?identifier={identityValue}&_count=5
+```
+
+* 這裡使用 [SearchAsync<T>] 方法來搜尋 Patient 資源，並傳入一個字串陣列作為搜尋參數
+* 在這個例子中，我們使用 `identifier={identityValue}` 作為搜尋條件，這表示我們要搜尋具有特定 Identifier 的 Patient 資源
+* 同時，我們也使用 `_count=5` 來限制回傳的結果數量為最多 5 筆
+* 當伺服器成功處理搜尋請求後，會回傳一個包含符合條件的 Patient 資源的 Bundle 回應
+* 在螢幕上顯示搜尋結果的總數量
+* 所謂的 Bundle，是 FHIR 中用來封裝多個資源的容器，例如，在這裡將會檢查 bundle.Entry 項目，篩選出其中的 Patient 資源
+* 然後逐一列出每個 Patient 的 ID、姓名與活躍狀態
+* 這樣就可以看到所有符合搜尋條件的 Patient 資源
+
+## 刪除
+* 最後，我們可以刪除剛剛建立的 Patient 資源
+* 使用 `await client.DeleteAsync($"Patient/{created.Id}");` 方法來刪除該 Patient 資源
+* 這個方法會發送一個 HTTP DELETE 請求到 FHIR 伺服器的 /Patient/{id} 端點
+* 當伺服器成功處理刪除請求後，該 Patient 資源將會被移除
+* 為了確認刪除是否成功，我們可以嘗試再次查詢該 Patient 資源
+* 預期會收到 404 Not Found 或 410 Gone 的回應，表示 該資源已經不存在
+* 如果收到預期的回應，則表示刪除操作成功
+* 顯示刪除確認的訊息
+
+# 結論
+
+對於一個 FHIR Resource 要對其進行新增、查詢、更新、篩選、刪除的操作，使用 Hl7.Fhir.R4 套件中的 FhirClient 類別，可以大幅簡化程式碼的撰寫與維護工作。 FhirClient 物件提供了相對應的方法，CreateAsync、ReadAsync、UpdateAsync、SearchAsync、DeleteAsync 等，讓開發者可以輕鬆地與 FHIR 伺服器進行互動，而不需要手動處理 HTTP 請求與回應的細節。
+
+這些方法將會轉換成為 FHIR API 的呼叫方式，並自動處理資源的序列化與反序列化，讓開發者可以專注於業務邏輯的實現，而不需要擔心底層的通訊細節。
+
+
