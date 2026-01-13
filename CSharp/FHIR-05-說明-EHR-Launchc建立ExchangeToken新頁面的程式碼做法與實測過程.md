@@ -1,6 +1,6 @@
-# FHIR 05 說明 EHR Launchc 建立 ExchangeToken 新頁面的程式碼做法與實測過程
+# FHIR 05 說明 EHR Launch 建立 ExchangeToken 新頁面的程式碼做法與實測過程
 
-在上一篇文章中 [FHIR 04 在 EHR Launchc 建立新頁面來接收授權碼進而取得存取權杖並呼叫 FHIR API](https://csharpkh.blogspot.com/2026/01/FHIR-04--FHIR-API.html)  ，已經完成了相關 Exchange Token 的程式碼，透過這些新增的程式碼與頁面，透過準備新得到的存取權杖 Access Token 成功地呼叫 FHIR API 來讀取病患資料。
+在上一篇文章中 [FHIR 04 在 EHR Launch 建立新頁面來接收授權碼進而取得存取權杖並呼叫 FHIR API](https://csharpkh.blogspot.com/2026/01/FHIR-04--FHIR-API.html)  ，已經完成了相關 Exchange Token 的程式碼，透過這些新增的程式碼與頁面，透過準備新得到的存取權杖 Access Token 成功地呼叫 FHIR API 來讀取病患資料。
 
 首先，先來執行這個專案，看看執行成果，接著，再來說明這些程式碼的做法與實測過程。
 

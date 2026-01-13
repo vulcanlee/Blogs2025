@@ -1,4 +1,4 @@
-# FHIR 04 在 EHR Launchc 建立新頁面來接收授權碼進而取得存取權杖並呼叫 FHIR API
+# FHIR 04 在 EHR Launch 建立新頁面來接收授權碼進而取得存取權杖並呼叫 FHIR API
 
 在上一篇文章中 [FHIR 03 說明透過 EHR Launch 取得授權碼的程式碼做法與實測過程
 ](https://csharpkh.blogspot.com/2026/01/FHIR-03--EHR-Launch-.html)  ，我們已經成功地透過 EHR Launch 流程取得了授權碼 (Authorization Code) 。
