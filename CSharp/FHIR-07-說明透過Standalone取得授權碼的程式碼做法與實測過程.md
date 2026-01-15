@@ -1,0 +1,237 @@
+# FHIR 07 說明透過 Standalone 取得授權碼的程式碼做法與實測過程
+
+在上一篇文章中 [FHIR 06 建立 Standalone Launch App](https://csharpkh.blogspot.com/2026/01/FHIR-06Standalone-Launch-App.html)  ，我們已經成功建立了一個 Standalone Launch App，並且可以直接開啟這個系統的啟動網頁，便可以開始進行 Smart On FHIR 規範中的第一個部分，那就是如何透過 Standalone Launch 模式來取得授權碼 (Authorization Code)，在這篇文章中，將會來進行展示實際的程式碼做法與測試過程。
+
+若這個系統可以正常運作，那麼將會來了解這個專案內的程式碼作法，並且說明 Launch 這個頁面的運作流程與程式碼設計過程。
+
+## 執行結果說明
+
+依照底下步驟操作，完成使用 Smart On FHIR 沙盒環境來進行 Standalone Launch 的授權碼取得流程：
+
+* 開啟並且執行 [SmartStandalone1]
+* 這裡是執行後的螢幕截圖，也就是 Blazor 開發框架的範例的啟動畫面
+![](../Images/cs2025-914.png)
+* 開啟沙盒驗證網頁 [https://thas.mohw.gov.tw/]
+* 這裡需要先進行身分驗證，點選 [登入] 文字連結
+* 在登入對話窗內，依序輸入帳號、密碼、驗證碼
+![](../Images/cs2025-913.png)
+* 最後點選 [登入] 按鈕，完成身分驗證作業
+* 點選上方的 [Sand Box] 連結，進入沙盒系統
+* 現在出現了 [SAND-BOX] 對話窗
+![](../Images/cs2025-912.png)
+* 對於 [請選擇] 下拉選單，選擇 [Provider Standalone Launch] 項目，也就是預設值
+![](../Images/cs2025-902.png)
+* 從 [SAND-BOX] 對話窗，可以看到 ISS Server URL，這個值代表了 FHIR 伺服器的位址，也就是註冊在系統中 appsettings.json 內的值，有了這個 URL，系統才知道要與哪一個 FHIR 伺服器進行互動
+* 在瀏覽器的位置列中，輸入 `https://localhost:7108/launch`
+* 其中， [https://localhost:7108/launch] 端點，就是剛剛撰寫程式碼的 Razor 元件頁面
+* 接著，系統會自動將我們的瀏覽器，重新導向到授權伺服器: `https://thas.mohw.gov.tw/v/r4/sim/WzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/auth/authorize?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid%20fhirUser%20profile%20launch%2Fpatient%20patient%2F%2A.read%20patient%2FEncounter.read%20patient%2FMedicationRequest.read%20patient%2FServiceRequest.read&state=46b3ee64863a4a3ba83a8c63443a72d9&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIn0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxNzAvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MzYxNjc4LCJleHAiOjE3NjgzNjE5Nzh9.Y-GuEoWk0Bn6B9lquGd-mqSBPKqGVVmGgdteDNV-3K8&state=1116e8253ddf4f0db8b5c0941eecd7de`
+* 此時網頁畫面出會出現底下螢幕截圖，會有這樣的效果，是程式碼會暫停一段時間，故意讓使用者看到準備要切換到該網頁的畫面
+![](../Images/cs2025-901.png)
+* 現在，將會進入到 FHIR 的授權伺服器，要取得授權碼，當取得了授權碼之後，就會使用 redirect_uri 參數，重新導向回到我們開發的頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code
+* 在網頁上，將會看到下面的畫面截圖，準備進入到身分驗證階段，此時的 URL 為： `https://thas.mohw.gov.tw/provider-login?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=52595722547f4aa2bf70339cb95bd650&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir&login_type=provider`
+![](../Images/cs2025-908.png)
+* 在這裡使用預設的帳號與密碼，點選 [Login] 按鈕
+* 現在的畫面將會切換到選擇病患的畫面，此時的網址為： `https://thas.mohw.gov.tw/select-patient?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=52595722547f4aa2bf70339cb95bd650&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir&login_type=provider&login_success=1&provider=147533`
+![](../Images/cs2025-907.png)
+* 點選任一病患項目，準備進入到下一個階段
+* 現在網頁畫面出現了底下的畫面
+![](../Images/cs2025-900.png)
+* 這裡出現了 [Authorize App Launch] 對話窗，這裡需要你同意這個應用程式代表你，可以對 FHIR Server 做列出能力清單的操作。
+* 此時，現在可以點選 [Approve] 按鈕，來同意這個應用程式的授權要求
+* 當點選了 [Approve] 按鈕之後，系統將會重新導向回到我們的應用程式頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code 與 state 參數
+* 可是，卻看到的底下畫面
+![](../Images/cs2025-899.png)
+* 在此看到了 
+
+```
+Not Found
+Sorry, the content you are looking for does not exist.
+```
+
+ 的訊息，這是因為我們的 redirect_uri 端點 `https://localhost:7108/ExchangeToken?code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdC1kcyJ9LCJjbGllbnRfaWQiOiJzbWFydC1hcHAiLCJyZWRpcmVjdF91cmkiOiJodHRwczovL2xvY2FsaG9zdDo3MTA4L0V4Y2hhbmdlVG9rZW4iLCJzY29wZSI6Im9wZW5pZCBmaGlyVXNlciBwcm9maWxlIGxhdW5jaC9wYXRpZW50IHBhdGllbnQvKi5yZWFkIHBhdGllbnQvRW5jb3VudGVyLnJlYWQgcGF0aWVudC9NZWRpY2F0aW9uUmVxdWVzdC5yZWFkIHBhdGllbnQvU2VydmljZVJlcXVlc3QucmVhZCIsInBrY2UiOiJhdXRvIiwiY2xpZW50X3R5cGUiOiJwdWJsaWMiLCJ1c2VyIjoiUHJhY3RpdGlvbmVyLzE0NzUzMyIsImlhdCI6MTc2ODQ1OTA3MCwiZXhwIjoxNzY4NDU5MzcwfQ.hWzbrt4j6qpAPGukMZpXOZ0KIBP4jsPPBc7Ikdr9X8k&state=8ed59eff289d49c788657109f7972a69` 
+* 會有這樣的結果，是因為我們還沒有設計 [ExchangeToken] 頁面程式碼，才會看到這樣的結果導致的
+* 對於 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdC1kcyJ9LCJjbGllbnRfaWQiOiJzbWFydC1hcHAiLCJyZWRpcmVjdF91cmkiOiJodHRwczovL2xvY2FsaG9zdDo3MTA4L0V4Y2hhbmdlVG9rZW4iLCJzY29wZSI6Im9wZW5pZCBmaGlyVXNlciBwcm9maWxlIGxhdW5jaC9wYXRpZW50IHBhdGllbnQvKi5yZWFkIHBhdGllbnQvRW5jb3VudGVyLnJlYWQgcGF0aWVudC9NZWRpY2F0aW9uUmVxdWVzdC5yZWFkIHBhdGllbnQvU2VydmljZVJlcXVlc3QucmVhZCIsInBrY2UiOiJhdXRvIiwiY2xpZW50X3R5cGUiOiJwdWJsaWMiLCJ1c2VyIjoiUHJhY3RpdGlvbmVyLzE0NzUzMyIsImlhdCI6MTc2ODQ1OTA3MCwiZXhwIjoxNzY4NDU5MzcwfQ.hWzbrt4j6qpAPGukMZpXOZ0KIBP4jsPPBc7Ikdr9X8k` 則是授權碼
+* 這個授權碼是以 JWT 格式所編碼的字串
+* 將過解譯這個 JWT 字串，將會看到這樣的 JSON 物件
+```json
+{
+  "context": {
+    "need_patient_banner": true,
+    "smart_style_url": "https://thas.mohw.gov.tw/smart-style.json",
+    "patient": "pat-ds"
+  },
+  "client_id": "smart-app",
+  "redirect_uri": "https://localhost:7108/ExchangeToken",
+  "scope": "openid fhirUser profile launch/patient patient/*.read patient/Encounter.read patient/MedicationRequest.read patient/ServiceRequest.read",
+  "pkce": "auto",
+  "client_type": "public",
+  "user": "Practitioner/147533",
+  "iat": 1768459070,
+  "exp": 1768459370
+}
+```
+
+* 到此為止，我們已經成功透過 Standalone Launch 模式，取得授權碼，接下來我們將會在下一篇文章中，說明如何使用這個授權碼，來交換取得存取權杖 (Access Token)，並且使用這個存取權杖，來存取 FHIR 伺服器中的病患資源資料
+
+## 專案服務與模型程式碼說明
+
+### SettingService.cs
+* 這個服務會注入 `IOptions<SettingModel>` 物件，來取得 [appsettings.json] 設定檔中的相關設定值
+* 在 [program.cs] 檔案中，已經完成這個服務的注入設定
+
+```csharp
+#region 加入設定強型別注入宣告
+builder.Services.Configure<SettingModel>(builder.Configuration
+    .GetSection(MagicObjectHelper.SmartAppSettingKey));
+#endregion
+```
+
+* 這個服務內，只有一個方法 `GetSettingAsync` ，用來取得設定值物件
+* 在 [appsettings.json] 設定檔中，主要是要取得 [RedirectUrl] 這個值，用於當通過授權之後，要重新導向到原有專案內的頁面端點
+
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  },
+  "AllowedHosts": "*",
+  "SmartAppSetting": {
+    "FhirServerUrl": "https://thas.mohw.gov.tw/v/r4/sim/WzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/fhir",
+    "RedirectUrl": "https://localhost:7108/ExchangeToken",
+    "ClientId": "smart-app"
+  }
+}
+```
+
+### SmartAppSettingService.cs
+* 這個服務將會用於儲存在 Launch 頁面中的狀態值，透過 .NET 提供的 [分散式快取] 機制來存取狀態物件
+* 在 [program.cs] 中，使用底下程式碼註冊了 [分散式快取] 服務
+```csharp
+// 提供 IDistributedCache 的記憶體實作
+builder.Services.AddDistributedMemoryCache();
+```
+
+* 在 SmartAppSettingService 服務中，在建構式內注入了 `SettingService` 物件，因此可以取得 appsetting.json 內的設定值
+
+```csharp
+public SmartAppSettingService(SettingService settingService)
+{
+    this.settingService = settingService;
+
+    var data = settingService.GetValue();
+    Data.FhirServerUrl = data.FhirServerUrl;
+    Data.RedirectUrl = data.RedirectUrl;
+    Data.ClientId = data.ClientId;
+}
+```
+
+* 在建構式內，這裡將 [FhirServerUrl] 、 [RedirectUrl] 、 [ClientId] 這三個值，設定到 SmartAppSettingModel 物件內，也就是可以用於要儲存到分散式快取的狀態物件內
+* 對於這個方法， UpdateSetting ，則是用來更新分散式快取內的狀態物件
+
+```csharp
+public void UpdateSetting(SmartAppSettingModel model)
+{
+    Data.FhirServerUrl = model.FhirServerUrl;
+    Data.ClientId = model.ClientId;
+    Data.RedirectUrl = model.RedirectUrl;
+    Data.AuthCode = model.AuthCode;
+    Data.ClientState = model.ClientState;
+    Data.TokenUrl = model.TokenUrl;
+    Data.AuthorizeUrl = model.AuthorizeUrl;
+    Data.Iss = model.Iss;
+    Data.Launch = model.Launch;
+    Data.State = model.State;
+}
+```
+
+### OAuthStateStoreService.cs
+* 這個物件將會提供 [分散式快取] 的存取功能
+* 在建構式內，注入了 `IDistributedCache` 物件
+```csharp
+public OAuthStateStoreService(IDistributedCache cache) => _cache = cache;
+```
+* 這個服務內，提供了三個方法，分別是 `SaveAsync` 、 `LoadAsync` 與 `RemoveAsync`
+* 這三個方法，分別用來儲存、載入與刪除分散式快取內的狀態物件，這裡使用了 JSON 序列化與反序列化的方式，來將物件轉換成字串，並且存取到分散式快取內
+
+## Launch.razor 頁面程式碼說明
+* 在這個頁面，使用了底下語法，來接收使用 Query String 參數傳遞過來的值，不過，對於 Standalone Launch 模式下，這兩個參數根本用不到，其實，可以忽略掉。
+
+```html
+[SupplyParameterFromQuery(Name = "iss")]
+public string? Iss { get; set; }
+[SupplyParameterFromQuery(Name = "launch")]
+public string? LaunchCode { get; set; }
+```
+
+* 在 OnAfterRenderAsync 方法中，這裡會先檢查是否為第一次渲染頁面
+* 在第一次渲染事件發生的時候，將會執行底下的敘述
+
+```csharp
+protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool firstRender)
+{
+    if (firstRender)
+    {
+        KeepLaunchIss();
+        var bar = await GetMetadataAsync();
+        var authUrl = await GetAuthorizeUrlAsync();
+        authUrlMessage = $"重新導向到授權伺服器:{authUrl}";
+
+        StateHasChanged();
+
+        await System.Threading.Tasks.Task.Delay(5000);
+
+        NavigationManager.NavigateTo(authUrl);
+    }
+}
+```
+
+* 這裡主要會進行：責處理 SMART on FHIR 啟動流程：保存啟動參數、取得 FHIR 伺服器元資料、產生授權 URL 並導向授權伺服器
+* `KeepLaunchIss()` 方法，保存 SMART on FHIR 啟動參數 (iss 和 launch), 從查詢字串中取得 iss (FHIR 伺服器 URL) 和 launch (啟動代碼) 參數並儲存到應用程式設定中，不過，因為 Standalone Launch 模式下，這兩個值都是不存在的。正因為如此， `SmartAppSettingService.Data.FhirServerUrl = Iss;` 這一行程式碼，根本不會被執行到，因此，這裡的 FHIR Server URL 將會是在 appsettings.json 內設定的值。
+* `GetMetadataAsync()` 方法，從 FHIR 伺服器取得元資料 (CapabilityStatement)，解析 SMART on FHIR 的 OAuth 端點 (authorize 和 token URL) 並儲存到應用程式設定中
+* 最後將會，回傳一個布林值，表示是否成功取得授權和令牌端點
+* `GetAuthorizeUrlAsync` 方法，產生 OAuth 授權 URL，建立 state 參數以防止 CSRF 攻擊，將應用程式設定儲存到狀態存儲中，並組合完整的授權 URL，包含必要的 OAuth 參數：response_type、client_id、redirect_uri、scope、state、launch 和 aud
+* 最後將會，將瀏覽器導向到授權伺服器 URL，開始授權流程
+
+### GetMetadataAsync() 方法說明
+
+`GetMetadataAsync()` 方法主要做三件事：
+
+* 連接 FHIR 伺服器 - 使用 `FhirClient` 向 FHIR 伺服器請求 `metadata` 端點，取得 `CapabilityStatement` (能力聲明)
+* 解析 OAuth 端點 - 在 `CapabilityStatement` 中尋找 SMART on FHIR 的 OAuth 擴充資訊 (`oauth-uris`)，提取出：
+   - `authorize` URL (授權端點)
+   - `token` URL (令牌端點)
+* 驗證並回傳結果 - 將這兩個 URL 儲存到 `SmartAppSettingService` 中，並檢查是否都成功取得。若兩者皆不為空則回傳 `true`，否則回傳 `false`
+* 簡單來說，這個方法負責從 FHIR 伺服器探索並取得 OAuth 認證所需的授權和令牌端點 URL。
+
+### GetAuthorizeUrlAsync() 方法說明
+
+`GetAuthorizeUrlAsync()` 方法主要做三件事：
+
+* 產生安全狀態碼 - 建立一個唯一的 `state` GUID 字串，用於防止 CSRF (跨站請求偽造) 攻擊
+* 儲存狀態 - 將應用程式的設定資料 (`SmartAppSettingModel`) 以 `state` 為鍵值存入 `OAuthStateStoreService`，保留 10 分鐘有效期限
+* 組合授權 URL - 建構完整的 OAuth 授權請求 URL，包含所有必要參數：
+   - `response_type=code` (授權碼流程)
+   - `client_id` (客戶端識別碼)
+   - `redirect_uri` (回調網址)
+   - `scope` (請求的權限範圍，如讀取病患資料)
+   - `state` (安全狀態碼)
+   - `launch` (SMART 啟動代碼)
+   - `aud` (目標 FHIR 伺服器 URL)
+* 簡單來說，這個方法負責產生並回傳一個完整的 OAuth 授權 URL，用於將使用者重新導向到 FHIR 授權伺服器進行身份驗證。
+* 對於要取得授權碼的 URL，將會使用底下的程式碼
+
+```csharp
+string launchUrl = $"{SmartAppSettingService.Data.AuthorizeUrl}?response_type=code" +
+    $"&client_id={SmartAppSettingService.Data.ClientId}" +
+    $"&redirect_uri={Uri.EscapeDataString(SmartAppSettingService.Data.RedirectUrl)}" +
+    $"&scope={Uri.EscapeDataString("openid fhirUser profile launch/patient patient/*.read patient/Encounter.read patient/MedicationRequest.read patient/ServiceRequest.read")}" +
+    $"&state={SmartAppSettingService.Data.State}" +
+    $"&launch={SmartAppSettingService.Data.Launch}" +
+    $"&aud={Uri.EscapeDataString(SmartAppSettingService.Data.FhirServerUrl)}";
+```
+
+* 取得到這個 URL 之後，將會使用 `NavigationManager.NavigateTo` 方法，導向到授權伺服器，進行身分驗證，並且取得授權碼
+
