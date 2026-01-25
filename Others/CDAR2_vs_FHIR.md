@@ -1,4 +1,4 @@
-# HIS EMR EHR FHIR 這三者之間有何差異
+# HIS EMR EHR FHIR 這四者之間有何差異
 
 [耀瑄科技 新創小組]
 
