@@ -1,14 +1,14 @@
-# FHIR 03 說明透過 EHR Launch 取得授權碼的程式碼做法與實測過程
+# FHIR 07 說明透過 Standalone 取得授權碼的程式碼做法與實測過程
 
-在上一篇文章中 [FHIR 02 建立 EHR Launch App](https://csharpkh.blogspot.com/2026/01/FHIR-02EHR-Launch-App.html)  ，我們已經成功建立了一個 EHR Launch App，並且在 EHR 系統中註冊完成。 接下來，我們將說明如何透過 EHR Launch 模式來取得授權碼 (Authorization Code)，並且展示實際的程式碼做法與測試過程。
+在上一篇文章中 [FHIR 06 建立 Standalone Launch App](https://csharpkh.blogspot.com/2026/01/FHIR-06Standalone-Launch-App.html)  ，我們已經成功建立了一個 Standalone Launch App，並且可以直接開啟這個系統的啟動網頁，便可以開始進行 Smart On FHIR 規範中的第一個部分，那就是如何透過 Standalone Launch 模式來取得授權碼 (Authorization Code)，在這篇文章中，將會來進行展示實際的程式碼做法與測試過程。
 
 若這個系統可以正常運作，那麼將會來了解這個專案內的程式碼作法，並且說明 Launch 這個頁面的運作流程與程式碼設計過程。
 
 ## 執行結果說明
 
-依照底下步驟操作，完成使用 Smart On FHIR 沙盒環境來進行 EHR Launch 的授權碼取得流程：
+依照底下步驟操作，完成使用 Smart On FHIR 沙盒環境來進行 Standalone Launch 的授權碼取得流程：
 
-* 開啟並且執行 [SmartEHRLaunch1]
+* 開啟並且執行 [SmartStandalone1]
 * 這裡是執行後的螢幕截圖，也就是 Blazor 開發框架的範例的啟動畫面
 ![](../Images/cs2025-914.png)
 * 開啟沙盒驗證網頁 [https://thas.mohw.gov.tw/]
@@ -19,32 +19,38 @@
 * 點選上方的 [Sand Box] 連結，進入沙盒系統
 * 現在出現了 [SAND-BOX] 對話窗
 ![](../Images/cs2025-912.png)
-* 對於 [請選擇] 下拉選單，選擇 [EHR Launch] 項目，也就是預設值
-* 在 [請輸入網址] 欄位中，輸入 `https://localhost:7108/launch`
-![](../Images/cs2025-911.png)
+* 對於 [請選擇] 下拉選單，選擇 [Provider Standalone Launch] 項目，也就是預設值
+![](../Images/cs2025-902.png)
+* 從 [SAND-BOX] 對話窗，可以看到 ISS Server URL，這個值代表了 FHIR 伺服器的位址，也就是註冊在系統中 appsettings.json 內的值，有了這個 URL，系統才知道要與哪一個 FHIR 伺服器進行互動
+* 在瀏覽器的位置列中，輸入 `https://localhost:7108/launch`
 * 其中， [https://localhost:7108/launch] 端點，就是剛剛撰寫程式碼的 Razor 元件頁面
-* 點選 [完成] 按鈕，系統會導向到 EHR Launch 頁面
-![](../Images/cs2025-910.png)
-* 在 [Launch] 端點頁面中，將會顯示出文字 [請稍後，正在初始化中]
-* 此時的網址列將會為 ： `https://localhost:7108/launch?iss=https://thas.mohw.gov.tw/v/r4/fhir&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0`
-* 這個網址將會是 Sandbox 系統導向到我們的 EHR Launch 頁面的網址，從這裡也看到了兩個重要的參數：
-  * `iss` ：代表 EHR 系統的 FHIR 伺服器位址 [https://thas.mohw.gov.tw/v/r4/fhir](https://thas.mohw.gov.tw/v/r4/fhir) ，這個將會是我們後續要與之互動的 FHIR 伺服器
-  * `launch` ：代表這次啟動的 Launch 參數，也就是 EHR 的系統所產生的 Launch Context
-* 接著，系統會自動將我們的瀏覽器，重新導向到授權伺服器: `https://thas.mohw.gov.tw/v/r4/auth/authorize?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid%20fhirUser%20profile%20launch%2Fpatient%20patient%2F%2A.read%20patient%2FEncounter.read%20patient%2FMedicationRequest.read%20patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir`
+* 接著，系統會自動將我們的瀏覽器，重新導向到授權伺服器: `https://thas.mohw.gov.tw/v/r4/sim/WzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/auth/authorize?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid%20fhirUser%20profile%20launch%2Fpatient%20patient%2F%2A.read%20patient%2FEncounter.read%20patient%2FMedicationRequest.read%20patient%2FServiceRequest.read&state=46b3ee64863a4a3ba83a8c63443a72d9&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIn0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxNzAvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MzYxNjc4LCJleHAiOjE3NjgzNjE5Nzh9.Y-GuEoWk0Bn6B9lquGd-mqSBPKqGVVmGgdteDNV-3K8&state=1116e8253ddf4f0db8b5c0941eecd7de`
 * 此時網頁畫面出會出現底下螢幕截圖，會有這樣的效果，是程式碼會暫停一段時間，故意讓使用者看到準備要切換到該網頁的畫面
-![](../Images/cs2025-909.png)
-* 現在，將會進入到 Sand Box 的授權伺服器，要取得授權碼，當取得了授權碼之後，就會使用 redirect_uri 參數，重新導向回到我們開發的頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code
-* 在網頁上，將會看到下面的畫面截圖，準備進入到身分驗證階段，此時的 URL 為： `https://thas.mohw.gov.tw/provider-login?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=ab81aeae4fe84986bcca1e51948fa824&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider`
+![](../Images/cs2025-901.png)
+* 現在，將會進入到 FHIR 的授權伺服器，要取得授權碼，當取得了授權碼之後，就會使用 redirect_uri 參數，重新導向回到我們開發的頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code
+* 在網頁上，將會看到下面的畫面截圖，準備進入到身分驗證階段，此時的 URL 為： `https://thas.mohw.gov.tw/provider-login?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=52595722547f4aa2bf70339cb95bd650&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir&login_type=provider`
 ![](../Images/cs2025-908.png)
 * 在這裡使用預設的帳號與密碼，點選 [Login] 按鈕
-* 現在的畫面將會切換到選擇病患的畫面，此時的網址為： `https://thas.mohw.gov.tw/select-patient?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7108%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=15fb5f43e861447cbb482a399c4fe7ab&launch=WzAsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Ffhir&login_type=provider&login_success=1&provider=147533`
+* 現在的畫面將會切換到選擇病患的畫面，此時的網址為： `https://thas.mohw.gov.tw/select-patient?response_type=code&client_id=smart-app&redirect_uri=https%3A%2F%2Flocalhost%3A7191%2FExchangeToken&scope=openid+fhirUser+profile+launch%2Fpatient+patient%2F*.read+patient%2FEncounter.read+patient%2FMedicationRequest.read+patient%2FServiceRequest.read&state=52595722547f4aa2bf70339cb95bd650&launch=&aud=https%3A%2F%2Fthas.mohw.gov.tw%2Fv%2Fr4%2Fsim%2FWzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0%2Ffhir&login_type=provider&login_success=1&provider=147533`
 ![](../Images/cs2025-907.png)
 * 點選任一病患項目，準備進入到下一個階段
+* 現在網頁畫面出現了底下的畫面
+![](../Images/cs2025-900.png)
+* 這裡出現了 [Authorize App Launch] 對話窗，這裡需要你同意這個應用程式代表你，可以對 FHIR Server 做列出能力清單的操作。
+* 此時，現在可以點選 [Approve] 按鈕，來同意這個應用程式的授權要求
+* 當點選了 [Approve] 按鈕之後，系統將會重新導向回到我們的應用程式頁面端點 `https://localhost:7108/ExchangeToken` ，並且在網址列中帶入授權碼參數 code 與 state 參數
 * 可是，卻看到的底下畫面
-![](../Images/cs2025-906.png)
-* 在此看到了 [無法連上這個網站] 的訊息，這是因為我們的 redirect_uri 端點 `https://localhost:7108/ExchangeToken?code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdGllbnQtVFdFTVItRE1TLTEyMzQ1Njc4OS1BMTIzNDU2Nzg5In0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxOTEvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MTI5MjYzLCJleHAiOjE3NjgxMjk1NjN9.yK4RJXRG34pjsdf53PhM6uiZnGOM89w0UdT6-8Wjd_8&state=15fb5f43e861447cbb482a399c4fe7ab` 
-* 會有這樣的結果，是因為我們上為設計 [ExchangeToken] 頁面程式碼，才會看到這樣的結果導致的
-* 對於 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdGllbnQtVFdFTVItRE1TLTEyMzQ1Njc4OS1BMTIzNDU2Nzg5In0sImNsaWVudF9pZCI6InNtYXJ0LWFwcCIsInJlZGlyZWN0X3VyaSI6Imh0dHBzOi8vbG9jYWxob3N0OjcxOTEvRXhjaGFuZ2VUb2tlbiIsInNjb3BlIjoib3BlbmlkIGZoaXJVc2VyIHByb2ZpbGUgbGF1bmNoL3BhdGllbnQgcGF0aWVudC8qLnJlYWQgcGF0aWVudC9FbmNvdW50ZXIucmVhZCBwYXRpZW50L01lZGljYXRpb25SZXF1ZXN0LnJlYWQgcGF0aWVudC9TZXJ2aWNlUmVxdWVzdC5yZWFkIiwicGtjZSI6ImF1dG8iLCJjbGllbnRfdHlwZSI6InB1YmxpYyIsInVzZXIiOiJQcmFjdGl0aW9uZXIvMTQ3NTMzIiwiaWF0IjoxNzY4MTI5MjYzLCJleHAiOjE3NjgxMjk1NjN9.yK4RJXRG34pjsdf53PhM6uiZnGOM89w0UdT6-8Wjd_8` 則是授權碼
+![](../Images/cs2025-899.png)
+* 在此看到了 
+
+```
+Not Found
+Sorry, the content you are looking for does not exist.
+```
+
+ 的訊息，這是因為我們的 redirect_uri 端點 `https://localhost:7108/ExchangeToken?code=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdC1kcyJ9LCJjbGllbnRfaWQiOiJzbWFydC1hcHAiLCJyZWRpcmVjdF91cmkiOiJodHRwczovL2xvY2FsaG9zdDo3MTA4L0V4Y2hhbmdlVG9rZW4iLCJzY29wZSI6Im9wZW5pZCBmaGlyVXNlciBwcm9maWxlIGxhdW5jaC9wYXRpZW50IHBhdGllbnQvKi5yZWFkIHBhdGllbnQvRW5jb3VudGVyLnJlYWQgcGF0aWVudC9NZWRpY2F0aW9uUmVxdWVzdC5yZWFkIHBhdGllbnQvU2VydmljZVJlcXVlc3QucmVhZCIsInBrY2UiOiJhdXRvIiwiY2xpZW50X3R5cGUiOiJwdWJsaWMiLCJ1c2VyIjoiUHJhY3RpdGlvbmVyLzE0NzUzMyIsImlhdCI6MTc2ODQ1OTA3MCwiZXhwIjoxNzY4NDU5MzcwfQ.hWzbrt4j6qpAPGukMZpXOZ0KIBP4jsPPBc7Ikdr9X8k&state=8ed59eff289d49c788657109f7972a69` 
+* 會有這樣的結果，是因為我們還沒有設計 [ExchangeToken] 頁面程式碼，才會看到這樣的結果導致的
+* 對於 `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJjb250ZXh0Ijp7Im5lZWRfcGF0aWVudF9iYW5uZXIiOnRydWUsInNtYXJ0X3N0eWxlX3VybCI6Imh0dHBzOi8vdGhhcy5tb2h3Lmdvdi50dy9zbWFydC1zdHlsZS5qc29uIiwicGF0aWVudCI6InBhdC1kcyJ9LCJjbGllbnRfaWQiOiJzbWFydC1hcHAiLCJyZWRpcmVjdF91cmkiOiJodHRwczovL2xvY2FsaG9zdDo3MTA4L0V4Y2hhbmdlVG9rZW4iLCJzY29wZSI6Im9wZW5pZCBmaGlyVXNlciBwcm9maWxlIGxhdW5jaC9wYXRpZW50IHBhdGllbnQvKi5yZWFkIHBhdGllbnQvRW5jb3VudGVyLnJlYWQgcGF0aWVudC9NZWRpY2F0aW9uUmVxdWVzdC5yZWFkIHBhdGllbnQvU2VydmljZVJlcXVlc3QucmVhZCIsInBrY2UiOiJhdXRvIiwiY2xpZW50X3R5cGUiOiJwdWJsaWMiLCJ1c2VyIjoiUHJhY3RpdGlvbmVyLzE0NzUzMyIsImlhdCI6MTc2ODQ1OTA3MCwiZXhwIjoxNzY4NDU5MzcwfQ.hWzbrt4j6qpAPGukMZpXOZ0KIBP4jsPPBc7Ikdr9X8k` 則是授權碼
 * 這個授權碼是以 JWT 格式所編碼的字串
 * 將過解譯這個 JWT 字串，將會看到這樣的 JSON 物件
 ```json
@@ -52,7 +58,7 @@
   "context": {
     "need_patient_banner": true,
     "smart_style_url": "https://thas.mohw.gov.tw/smart-style.json",
-    "patient": "patient-TWEMR-DMS-123456789-A123456789"
+    "patient": "pat-ds"
   },
   "client_id": "smart-app",
   "redirect_uri": "https://localhost:7108/ExchangeToken",
@@ -60,13 +66,12 @@
   "pkce": "auto",
   "client_type": "public",
   "user": "Practitioner/147533",
-  "iat": 1768129263,
-  "exp": 1768129563
+  "iat": 1768459070,
+  "exp": 1768459370
 }
 ```
 
-* 從這裡看到的 [patient] 欄位值 `patient-TWEMR-DMS-123456789-A123456789` ，這就是我們這次所選擇的病患資源 ID
-* 到此為止，我們已經成功透過 EHR Launch 模式，取得授權碼，接下來我們將會在下一篇文章中，說明如何使用這個授權碼，來交換取得存取權杖 (Access Token)，並且使用這個存取權杖，來存取 FHIR 伺服器中的病患資源資料
+* 到此為止，我們已經成功透過 Standalone Launch 模式，取得授權碼，接下來我們將會在下一篇文章中，說明如何使用這個授權碼，來交換取得存取權杖 (Access Token)，並且使用這個存取權杖，來存取 FHIR 伺服器中的病患資源資料
 
 ## 專案服務與模型程式碼說明
 
@@ -94,7 +99,7 @@ builder.Services.Configure<SettingModel>(builder.Configuration
   },
   "AllowedHosts": "*",
   "SmartAppSetting": {
-    "FhirServerUrl": "https://thas.mohw.gov.tw/v/r4/fhir",
+    "FhirServerUrl": "https://thas.mohw.gov.tw/v/r4/sim/WzIsIiIsIiIsIkFVVE8iLDAsMCwwLCIiLCIiLCIiLCIiLCIiLCIiLCIiLDAsMSwiIl0/fhir",
     "RedirectUrl": "https://localhost:7108/ExchangeToken",
     "ClientId": "smart-app"
   }
@@ -152,7 +157,8 @@ public OAuthStateStoreService(IDistributedCache cache) => _cache = cache;
 * 這三個方法，分別用來儲存、載入與刪除分散式快取內的狀態物件，這裡使用了 JSON 序列化與反序列化的方式，來將物件轉換成字串，並且存取到分散式快取內
 
 ## Launch.razor 頁面程式碼說明
-* 在這個頁面，使用了底下語法，來接收使用 Query String 參數傳遞過來的值
+* 在這個頁面，使用了底下語法，來接收使用 Query String 參數傳遞過來的值，不過，對於 Standalone Launch 模式下，這兩個參數根本用不到，其實，可以忽略掉。
+
 ```html
 [SupplyParameterFromQuery(Name = "iss")]
 public string? Iss { get; set; }
@@ -183,7 +189,7 @@ protected override async System.Threading.Tasks.Task OnAfterRenderAsync(bool fir
 ```
 
 * 這裡主要會進行：責處理 SMART on FHIR 啟動流程：保存啟動參數、取得 FHIR 伺服器元資料、產生授權 URL 並導向授權伺服器
-* `KeepLaunchIss()` 方法，保存 SMART on FHIR 啟動參數 (iss 和 launch), 從查詢字串中取得 iss (FHIR 伺服器 URL) 和 launch (啟動代碼) 參數並儲存到應用程式設定中
+* `KeepLaunchIss()` 方法，保存 SMART on FHIR 啟動參數 (iss 和 launch), 從查詢字串中取得 iss (FHIR 伺服器 URL) 和 launch (啟動代碼) 參數並儲存到應用程式設定中，不過，因為 Standalone Launch 模式下，這兩個值都是不存在的。正因為如此， `SmartAppSettingService.Data.FhirServerUrl = Iss;` 這一行程式碼，根本不會被執行到，因此，這裡的 FHIR Server URL 將會是在 appsettings.json 內設定的值。
 * `GetMetadataAsync()` 方法，從 FHIR 伺服器取得元資料 (CapabilityStatement)，解析 SMART on FHIR 的 OAuth 端點 (authorize 和 token URL) 並儲存到應用程式設定中
 * 最後將會，回傳一個布林值，表示是否成功取得授權和令牌端點
 * `GetAuthorizeUrlAsync` 方法，產生 OAuth 授權 URL，建立 state 參數以防止 CSRF 攻擊，將應用程式設定儲存到狀態存儲中，並組合完整的授權 URL，包含必要的 OAuth 參數：response_type、client_id、redirect_uri、scope、state、launch 和 aud
