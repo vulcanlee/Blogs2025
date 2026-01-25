@@ -1,7 +1,7 @@
 # FHIR 應用 : 「病人為主時序圖」
 
 
-![Image](../Images/x.png)
+![Image](../Images/x1.png)
 
 ---
 
