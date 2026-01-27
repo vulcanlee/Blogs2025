@@ -10,7 +10,7 @@ CanWellBeing 是⼀套 AI 驅動的腹部 CT 體組成分析應⽤程式，專�
 
 ## SMART on FHIR App 示範影片
 
-![](./Mega_Radiance_SMART_on_FHIR_App.mp4)
+![](https://github.com/vulcanlee/Blogs2025/raw/refs/heads/main/Others/Mega_Radiance_SMART_on_FHIR_App.mp4)
 
 # 使用情境
 1. 使用者使用 Standalone 方式啟動這個系統
