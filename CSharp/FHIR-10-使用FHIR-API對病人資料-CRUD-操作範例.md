@@ -4,101 +4,73 @@
 
 為了簡化相關的操作，Hl7.Fhir.R4 套件提供了一個方便的 [FhirClient] 類別，讓開發者可以更輕鬆地與 FHIR Server 進行互動。這個類別封裝了許多常用的 FHIR API 操作，讓我們可以透過簡單的方法呼叫來完成各種 CRUD 任務。
 
-首先，FHIR R4 有多少種 Resource 呢？FHIR R4 正式定義了 **157 種 Resource**（不含 Extension / DataType / ComplexType），涵蓋臨床、管理、財務、公共衛生等領域。
+在這篇文章中，將會針對 FHIR 中的 Patient 資源，示範如何建立病患資料，以及進行 CRUD（Create、Read、Update、Delete）操作。在此之前，先來了解何謂 FHIR Patient 病患資源以及有哪些欄位可以使用。
 
-最常見、最重要的基本 Resource，大約有 20 多種，這些 Resource 是我們在日常醫療資訊系統中最常會用到的。以下將常用 Resource 分為幾類，並描述用途與彼此關聯：
+FHIR 是目前醫療領域最重要的跨系統交換標準之一，其核心定義了許多常用的臨床與行政資訊資源，FHIR Patient 資源代表接受照護「個人（或動物）」的基本資料，用來建立、辨識、管理病人的人口統計學與行政資訊。Patient 不包含病人病歷細節（例如臨床紀錄），但常被其他資料資源所引用。
 
-## 病人與照護相關
+Patient 資源常見欄位包括：
 
-| Resource             | 用途                     | 跟其他的關聯                                      |
-| -------------------- | ---------------------- | ------------------------------------------- |
-| **Patient**          | 病人核心資料（姓名、性別、出生年月、識別碼） | 其他所有與病人相關的記錄都會 reference Patient            |
-| **Practitioner**     | 醫療人員資料（醫師、護理、物理治療師等）   | Encounter, Procedure, CarePlan 等會 reference |
-| **PractitionerRole** | 醫療人員角色（哪科、哪機構）         | 連結 Practitioner 與 Organization              |
-| **RelatedPerson**    | 與病人有關的親屬等              | Patient 的關聯者                                |
+* 基礎識別與狀態欄位
+  * identifier : 多個病人識別碼，如醫療記錄號碼（MRN）、健保號碼等。FHIR 中用 identifier 存放這些外部系統識別碼。
+  * active : Boolean 值表示該病人紀錄是否目前有效，例如是否為現行病人或已退件狀態。
+* 名稱與通訊資訊
+  * name : 病人的姓名（HumanName）。可以有多個，如正式姓名、別名等。
+  * telecom : 聯絡方式清單，例如電話、Email、SMS 等。
+* 基本人口數據
+  * gender : 行政性別。Allowed values：male | female | other | unknown。
+  * birthDate : 出生日期。
+  * deceased[x] : 病人是否已逝。依型別可選 boolean 或 datetime。
+* 位址與社會狀態
+  * address : 病人地址資訊（可以有多筆）。 
+  * maritalStatus : 婚姻狀態（CodeableConcept）。
+* 其他識別與描述
+  * multipleBirth[x] : 是否為多胞胎（Boolean 或整數表出生序）。
+  * photo : 病人照片圖檔（Attachment）。
+* Contact
+  * contact : 病人的緊急聯絡人或代表者，其下可含：
+    * relationship：與病人的關係
+    * name：名稱
+    * telecom：聯絡方式
+    * address：地址
+  這些欄位通常在臨床場景中被用來標註病人的緊急聯絡、監護人或代理人資訊。
+* Communication
+  * communication : 病人可用的語言資訊
+    * language：ISO language code
+    * preferred：是否為優先語言
+  此元素有助於跨語言環境中的照護與問診溝通。
+* Patient 的 Reference（鏈結）
+    * FHIR 設計中，Patient 資源本身並不直接含有大量臨床病歷，但其他 FHIR 資源會使用 **Reference(Patient)** 去指向病人。FHIR 官方文件列出了很多可能會參考 Patient 的資源。
+    * 支援 Reference 到 Patient 的資源`,下列為官方 Patient 規範中列出的部分資源，這些資源可能透過 reference 欄位指向 Patient
+      * Encounter：臨床訪視事件其 subject 可能是 Patient
+      * Observation：病人的測量或評估結果
+      * Condition：病人的臨床診斷
+      * Immunization：免疫接種紀錄
+      * MedicationRequest / MedicationAdministration / MedicationStatement：用藥相關資源
+      * AllergyIntolerance：過敏或不耐症
+      * Procedure：執行的醫療程序
+      * Claim / ExplanationOfBenefit：保險理賠申請
+      * CarePlan / CareTeam：照護計畫與團隊
+      …以及許多其他以 Patient 為核心的臨床紀錄相關資源。
+* Patient 會 Reference 其他資源
+  * 在 Patient 的欄位裡也包含對其他資源的 reference，用來建立直接關聯：
+  * generalPractitioner : 患者的主要照護提供者，可指向：
+    * Organization
+    * Practitioner
+    * PractitionerRole
+    這讓病人可以追蹤其主要照護醫師或醫療機構。
+  * managingOrganization : 管理此病人紀錄的組織。
+  * link.other : 用來指向另一個 Patient 或 RelatedPerson，用於描述此紀錄與另一個實體之間的關係（例如合併紀錄）。
+* Patient Resource 的 Extensions
+  * FHIR 的一大特色是擴展性，當基礎欄位不足以描述某些地區或業務需求時，可以定義 **Extension**：
+  * Extension 可以加在任一 Patient 層級，用以補充**無於基本資源中的資訊**
+  * 常見使用場景包括：
+    * 種族與族裔資訊
+    * 國籍、語言偏好的詳細資訊
+    * 臟器捐贈者狀態
+    * 其他地區政府需求的欄位
+  * 定義 Extension 時，需提供唯一的 URL 作為識別，並且說明其結構與使用方式。
 
-## 照護事件與行為
-
-| Resource        | 用途             | 關聯                              |
-| --------------- | -------------- | ------------------------------- |
-| **Encounter**   | 就診事件（門診、住院、急診） | Patient, Practitioner, Location |
-| **Appointment** | 約診             | Patient, Practitioner, Schedule |
-| **Procedure**   | 醫療處置（手術、檢查等）   | Encounter, Patient              |
-| **CarePlan**    | 照護計畫           | Patient, Practitioner           |
-
-**簡單例子：**
-
-* Encounter → 描述一次病人在院內的流動
-* Appointment → 有時病人需先掛號
-* Procedure → 真正做的檢查或手術
-
-## 3. 醫療資料（主要）
-
-| Resource                     | 用途        | 常跟患者關聯                |
-| ---------------------------- | --------- | --------------------- |
-| **Observation**              | 測量 / 檢驗值  | vitals, lab result 等  |
-| **Condition**                | 疾病 / 健康問題 | 記錄病人目前的診斷             |
-| **Medication**               | 藥品資訊      | 供用於 Rx                |
-| **MedicationRequest**        | 開立處方      | Patient, Practitioner |
-| **MedicationAdministration** | 實際給藥狀態    | Patient, Practitioner |
-| **ServiceRequest**           | 檢查/治療請求   | Patient, Practitioner |
-| **DiagnosticReport**         | 檢驗報告      | Observation 集合        |
-| **AllergyIntolerance**       | 過敏資訊      | Patient               |
-
-**簡單例子：**
-
-* Observation → 量血壓、血糖
-* Condition → 糖尿病診斷
-* MedicationRequest → 醫師開立藥物
-* DiagnosticReport → 實驗室報告
-
-## 4. 組織與地點
-
-| Resource              | 用途          |
-| --------------------- | ----------- |
-| **Organization**      | 醫院 / 診所     |
-| **Location**          | 醫療地點（病房、診間） |
-| **HealthcareService** | 該地方提供什麼服務   |
-
-## 5. 身分與安全
-
-| Resource       | 用途          |
-| -------------- | ----------- |
-| **Consent**    | 病人同意/拒絕資料使用 |
-| **AuditEvent** | 記錄誰做過什麼（稽核） |
-
-## 6. 支援性的管理與財務
-
-| Resource                    | 用途          |
-| --------------------------- | ----------- |
-| **OrganizationAffiliation** | 醫療機構的合作     |
-| **Claim / ClaimResponse**   | 保險理賠請求與回覆   |
-| **Coverage**                | 保險方案（是否有給付） |
-
-## 簡單的使用流程與實際意義（用例）
-
-### 情境：門診看診
-
-1. **Patient** 進入門診
-2. 建立 **Encounter**（這次就診）
-3. 醫師用 **Observation** 記錄血壓
-4. 開立 **MedicationRequest** 處方
-5. 可能建立 **Condition**（病名）
-6. 若做檢查，會有 **ServiceRequest** 與後續 **DiagnosticReport**
-
-給初學者的建議學習順序
-
-你可以按照以下順序理解與練習：
-
-| 步驟 | 重點                                       |
-| -- | ---------------------------------------- |
-| 1  | 先掌握 Patient / Practitioner               |
-| 2  | 再理解 Encounter / Appointment              |
-| 3  | 再熟悉 Observation / Condition              |
-| 4  | 最後看 MedicationRequest / DiagnosticReport |
-
-
-在初步了解了 FHIR Server 中的資源類型與應用之後，接下來我們將透過一個簡單的範例程式碼，示範如何使用 Hl7.Fhir.R4 套件中的 FhirClient 類別，先來針對單一資源來了解如何做到 CRUD ： 新增、修改、刪除、查詢的操作，要如何能夠在 .NET C# 中來完成。為了要簡化體驗開發過程，這裡將會採用 主控台應用程式 (Console App) 的方式來進行示範。
+接下來我們將透過一個簡單的範例程式碼，示範如何使用 Hl7.Fhir.R4 套件中的 FhirClient 類別，先來針對單一資源來了解如何做到 CRUD ： 新增、修改、刪除、查詢的操作，要如何能夠在 .NET C# 中來完成。為了要簡化體驗開發過程，這裡將會採用 主控台應用程式 (Console App) 的方式來進行示範。
 
 ## 建立 主控台應用程式 專案
 * 開啟 Visual Studio 2026
