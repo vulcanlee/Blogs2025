@@ -1,759 +1,429 @@
-# FHIR 14 對於 FHIR DiagnosticReport 的操作範例
+# FHIR 14 對於 FHIR Observation 的操作範例
 
-最近正在進行一個 SMART on FHIR 應用程式的開發，這個應用程式會從 FHIR 伺服器讀取病患資料(身高、體重、性別、年紀)，接著會由操作者上傳 L3 DICOM 影像道系統中，一旦使用者觸發了 [AI推論] 功能之後，將會把這些數據與影像檔案傳送到後端 Web API 內，並交由 AI 推論系統進行分析後得到這個病患的身體組成指標與一個五彩影像圖片，此時，這個 SMART on FHIR 應用系統，將會取得這些資訊，接著需要這些AI推論結果要寫入到 FHIR 伺服器中。
+在這篇文章內指向的 FHIR Server 內的資料，將會採用 [Synthea] 所產生的模擬醫療紀錄，這是透過 [Sample FHIR Bulk Export Datasets](https://github.com/smart-on-fhir/sample-bulk-fhir-datasets) 下載 Medium (100 patients, 17MB zipped, 129MB unzipped) 大小的資料集。
 
-這裡遇到的第一個問題就是，這些資訊需要寫到 FHIR Server 的那些資源內，並且要採用甚麼樣的格式與內容轉成 FHIR 需要的格式資源，才能夠讓這些資訊在 FHIR 伺服器內被妥善的儲存與管理，並且能夠被其他系統讀取與使用。
+這在 FHIR Server 是在內部主機上，採用的同樣是 R4 的版本，並且在這個 FHIR Server 上，已經事先載入了這個 Synthea 產生的模擬醫療紀錄資料集。
 
-面對這樣的需求，需要將 AI 分析結果與產生後的圖片寫入到 FHIR 內，會有不同的做法，而且各有其優缺點，以下將會說明兩種常見的做法：
+我個人覺得 Observation 資源在 FHIR 中，相對是比較複雜的，因此，同樣的還是先來簡單了解這個資源用途
 
-* PNG 圖片外部連結：方法一，使用 URL 外部參考
+## Observation 的定位與常見用途
 
-**適合**：你不想把 PNG 當成 FHIR 內的「資源」，只是想在報告裡附一張圖。
+Observation 用來表達「被觀察到的事實」：包含檢驗、生命徵象、影像量測結果、問卷量測值、裝置量測值等，通常以「一個 code + 一個 value（或缺值原因）」為核心，再搭配時間、對象、方法、檢體、參考區間等語意。
 
-```
-Patient (test-patient-001)
-  ▲               ▲
-  │ subject       │ subject
-  │               │
-  │         Observation (1筆，含6個 component)
-  │               │ • SMI, SMD, IMAT
-  │               │ • LAMA, NAMA, MYOSTEATOSIS
-  │               ▲
-  │               │ result[]
-  │               │
-DiagnosticReport
-      │
-      │ presentedForm[].Url
-      ▼
-PNG 圖片 URL (外部連結: http://localhost/result/2311)
-```
+## Observation 主體欄位
 
-* PNG 圖片編碼：方法二，使用 Media 資源
+> 下列每個欄位都列出：意義、用法、注意事項。欄位清單與基礎定義來自 Observation 結構與範本。
 
-這裡將會採用將這個圖片當成一個 Media 資源的方式來處理，並且在 DiagnosticReport 內以 result[] 的方式來參照這個 Media 資源。
+* identifier（0..*）：意義：業務識別碼（例如 LIS 檢體報告號、量測單號）。用法：用於跨系統對帳、避免只靠 `id`（伺服器內部 id）做整合。* 注意：FHIR Server 內部的 `id` 是資源版本控制的識別碼，不適合用於業務層面的對帳；`identifier` 才是業務識別碼。
 
-**適合**：你想把 PNG 當成 FHIR 內的「資源」，並且希望在報告裡附一張圖。
+* basedOn（0..*）：意義：此 Observation 用來履行的「計畫/醫囑/請求」。用法：常指向 `ServiceRequest`（檢驗/檢查醫囑）、`MedicationRequest` 等。注意：同一檢驗結果可能同時對應多個請求（例如合併下單）。
 
-```
-Patient
-  ▲
-  │ subject
-  │
-DiagnosticReport  ── result[] ──► Observation(1筆，含6個component)
-      │                              │
-      │ (選配) imagingStudy[]         │ derivedFrom[]
-      ▼                              ▼
-  ImagingStudy (選配)                PNG
-```
+* partOf（0..*）：意義：此 Observation 是某事件的一部分（例如某次處置、用藥給予、影像檢查流程）。用法：可指向 `Procedure`、`ImagingStudy`、`MedicationAdministration` 等。注意：用於表達「結果隸屬於某個已發生事件」。
+* status（1..1）：意義：Observation 的狀態（registered / preliminary / final / amended…）。用法：臨床通常最重視 `final`（已確認）。注意：必填；也是搜尋/流程判斷的關鍵欄位。
+* category（0..*）：意義：高階分類（例如 laboratory / vital-signs / imaging…）。用法：讓 UI 或查詢能快速分群（例如「先抓生命徵象」）。注意：可多值（同一筆 Observation 可同時落在不同分類視角）。
+* code（1..1）：意義：觀察項目是什麼（觀察的名稱/代碼），例如「血糖」、「體溫」。用法：通常用標準術語（常見是 LOINC），也可加多個 coding 表示更細緻或不同視角的同義碼。注意：`code` 定義了 Observation 的語意核心；很多時候「測哪裡」其實已經隱含在 code（例如 Blood Glucose）。
+* subject（0..1）：意義：Observation 關於誰/什麼（常見：病人）。用法：通常是 `Patient`，也可能是 `Group`、`Device`、`Location`。注意：有些量測不是「病人層級」而是設備或地點層級。
+* focus（0..*）：意義：當「觀察焦點」不是 `subject` 本人時，用 `focus` 指出真正被關注的對象。用法：例如 subject=Patient，但 focus=植入裝置、某個檢體、或另一個 Observation。注意：與 `specimen`、`bodySite` 一起用來精準表達觀察焦點差異。
+* encounter（0..1）：意義：量測發生所屬的就醫事件（門診/急診/住院的一次 Encounter）。用法：做時序圖、就醫分段、或住院期間趨勢很重要。注意：不是所有 Observation 都一定能對應到 Encounter（例如居家裝置回傳）。
+* effective[x]（0..1）：意義：臨床上最相關的時間/期間（physiologically relevant time）。型別：`dateTime` / `Period` / `Timing` / `instant`。用法：抽血：通常是採檢時間（或採檢期間）。24 小時尿液：用 `Period` 表示收集起訖。注意：這個時間通常比 `issued` 更能代表「這個數值對病人的意義」。
+* issued（0..1）：意義：此版本 Observation 被發布/可取得 的時間點。用法：例如 LIS 驗證後釋出結果時間。注意：與 `effective[x]` 不同：effective 是「量測對病人的生理/臨床時間」，issued 是「系統釋出時間」。
+* performer（0..*）：意義：對此 Observation 負責/執行的人或組織。用法：可指向 Practitioner / Organization / CareTeam 等。注意：檢驗可能是科室或實驗室（Organization），生命徵象可能是護理人員（PractitionerRole）。
 
-比較這兩種做法的差異與優缺點如下：
+## 觀察的上下文：部位、方法、檢體、設備
 
-| 方式 | 優點 | 缺點 |
-|---|---|---|
-| URL 外部連結 | 不需要將圖片存入 FHIR 伺服器，節省儲存空間 | 依賴外部服務，可能會有存取問題 |
-| Media 資源 | 將圖片當成 FHIR 資源，方便管理與存取 | 需要將圖片存入 FHIR 伺服器，增加儲存需求 |
+* bodySite（0..1）：意義：觀察的身體部位。用法：例如左右手、特定肌群、特定器官部位。注意：當部位並未由 `code` 足夠描述時才特別需要。
+* method（0..1）：意義：量測方法。用法：例如「pulse oximetry」、「酵素法」等。注意：方法不同可能導致可比性差，若要做趨勢/分析很重要。
+* specimen（0..1）：意義：檢體。用法：血液、尿液、組織等，通常指向 Specimen 資源。注意：與 `effective[x]` 常一起解釋（採檢時間 vs 報告釋出時間）。
+* device（0..1）：意義：產生量測資料的裝置。用法：床邊監視器、居家量測設備等。注意：跨設備趨勢比較、校正與可信度判斷會用到。  
 
-在此的考量將會是採用第一種方案，也就是將圖片的 URL 參考寫入到 DiagnosticReport 的 presentedForm[] 內，這樣就不需要把圖片當成一個 FHIR 資源來管理，而是直接在報告裡附上圖片的連結，這樣的做法比較簡單，而且似乎對於 FHIR Server 的負擔不會過重。
+## 觀察的群組與衍生關係：`hasMember` / `derivedFrom` / `component`
 
-對於這次的需求，也需要針對 DiagnosticReport 這個資源進行操作，因此，這裡也對於 DiagnosticReport 資源做個了解說明，
+* hasMember（0..*）：意義：把多個 Observation（或 QuestionnaireResponse、MolecularSequence）聚成一組的關聯。用法：適合「一組內的成員可獨立理解/可獨立使用」的情境（相對於 component）。注意：規格明確把 `hasMember` 視為 Observation grouping 的一種手段。
+* derivedFrom（0..*）：意義：此 Observation 由哪些資料/測量衍生而來（DocumentReference、ImagingStudy、Media、QuestionnaireResponse、Observation…）。用法：例如 AI 從影像推論出的身體組成結果，可用 derivedFrom 指回影像或原始量測。注意：也是 Observation grouping/關聯的重要元素之一。
+* component（0..*）：意義：同一個 Observation 內的「組成結果」（血壓：收縮壓/舒張壓；基因檢測：多個 component）。用法：component 適用於「離開母 Observation 就很難被合理解讀/使用」的子結果。注意：如果 `Observation.code` 與某個 `Observation.component.code` 相同，則 母 Observation 對應該 code 的 `value[x]` 不得出現（避免重複/衝突）。
 
-DiagnosticReport 是 FHIR Workflow 中的一種事件型資源，其主要用途為：
+現在對於 Observation 資源有了初步認識，接下來，我們就來看看如何使用 C# 程式碼，透過 FHIR Client 來查詢 Observation 資源，並且將查詢到的結果顯示在主控台視窗內。
 
-* 彙整和表達完整的診斷服務成果，涵蓋文字敘述、編碼結果、影像或可附加完整報告（如 PDF）。
-* 結合診斷程序上下游關係，例如檢驗請求、觀察結果、醫療就診事件等。
-* 與 Observation 形成一對多的關係：報告可能引用多個 Observation 來表示原子值（例如血液檢查各項指標）。
-* 能支援多樣診斷類別：實驗室、影像、病理、心臟檢查等。
+## 建立測試專案
 
-從臨床流程來看，DiagnosticReport 是 [檢查完成後的產品] ，可連結到請求來源（例如 ServiceRequest）、檢體（Specimen）、受檢者（Patient）、醫療事件（Encounter）、解讀者（Practitioner）等多種資源。
+請依照底下的操作，建立起這篇文章需要用到的練習專案
 
-## DiagnosticReport 的欄位解構：名稱、意義與實際用法
+* 打開 Visual Studio 2026 IDE 應用程式
+* 從 [Visual Studio 2026] 對話窗中，點選右下方的 [建立新的專案] 按鈕
+* 在 [建立新專案] 對話窗右半部
+  * 切換 [所有語言 (L)] 下拉選單控制項為 [C#]
+  * 切換 [所有專案類型 (T)] 下拉選單控制項為 [主控台]
+* 在中間的專案範本清單中，找到並且點選 [主控台應用程式] 專案範本選項
+  > 專案，用於建立可在 Windows、Linux 及 macOS 於 .NET 執行的命令列應用程式
+* 點選右下角的 [下一步] 按鈕
+* 在 [設定新的專案] 對話窗
+* 找到 [專案名稱] 欄位，輸入 `csOrganization` 作為專案名稱
+* 在剛剛輸入的 [專案名稱] 欄位下方，確認沒有勾選 [將解決方案與專案至於相同目錄中] 這個檢查盒控制項
+* 點選右下角的 [下一步] 按鈕
+* 現在將會看到 [其他資訊] 對話窗
+* 在 [架構] 欄位中，請選擇最新的開發框架，這裡選擇的 [架構] 是 : `.NET 10.0 (長期支援)`
+* 在這個練習中，需要去勾選 [不要使用最上層陳述式(T)] 這個檢查盒控制項
+  > 這裡的這個操作，可以由讀者自行決定是否要勾選這個檢查盒控制項
+* 請點選右下角的 [建立] 按鈕
 
-以下依照官方定義逐一解析 DiagnosticReport 項目（含基本資源層級與臨床需求）：
+稍微等候一下，這個 背景工作服務 專案將會建立完成
 
-* identifier ： 報告的商業識別碼，可為多個（例如各系統內部 ID、實驗室編號等）。此欄位利於跨系統辨識同一報告。
-* basedOn ： 表示這份 DiagnosticReport 是基於何種請求資源所產生，如 CarePlan、MedicationRequest、NutritionOrder 或 ServiceRequest。這是一種 workflow 追蹤，用於回溯診斷產出的起源。
-* status ： 報告的狀態，例如 registered、partial、preliminary、final 等，影響臨床使用時機（是否為最終結果）。
-* category ： 代表報告所屬的服務類型，例如實驗室（lab）、影像（imaging）等，用以檢索與分類。代表報告所屬的服務類型，例如實驗室（lab）、影像（imaging）等，用以檢索與分類。
-* code ： 為必填欄位，用來標示這份報告的具體診斷性質（如一般實驗室報告、特定掃描診斷等），典型使用 LOINC 等編碼系統。
-* subject ： **核心欄位**，這是報告的主體（subject），通常會 reference Patient。FHIR 的設計允許 subject 為 Patient、Group、Device 或 Location，但在大部分臨床上下文中的常見用法是指向 Patient（受檢者）。
-這個 reference 是 DiagnosticReport 與 Patient 之間最直接的連結點。
-* encounter ： 連結到 Encounter 資源，用於表明這份報告關聯到何種就診事件（例如門診、住院事件等），有助於維持臨床事件的時間與上下文關係。
-* effective[x] ： 表示報告結果與檢查執行的時間相關資訊，可以是單一時間（effectiveDateTime）或時間區間（effectivePeriod），用於時間序列與診療路徑分析。
-* issued ： 報告何時正式發布或可供查閱。這在流程控制與資料版本管理中非常重要。
-* performer ： 這是執行該報告之診斷服務的實體參考，可能是 Practitioner、PractitionerRole、Organization 或 CareTeam。可用於責任區分與品質評估。
-* resultsInterpreter ： 引用那些負責最終結果解讀之專業角色（例如主治醫師或解讀者 team）。引用那些負責最終結果解讀之專業角色（例如主治醫師或解讀者 team）。
-* specimen ： 如果診斷基於檢體（例如血液、組織切片），會 Reference Specimen 資源。這能讓前後端系統將報告結果與原始檢體檔案串連。
-* result ： DiagnosticReport 與 Observation 資源最重要的關聯之一：這表示此報告對“各別觀察值”的引用（例如血中紅血球濃度這種原子值），通常是 0..* 多對多。
-* imagingStudy ： 在影像報告中，直接引用 ImagingStudy，使接收端能查詢完整的影像內容（例如 DICOM Study）以供瀏覽與視覺化。
-* media ： 若診斷報告涉及附加的影像（例如拍攝圖片、病理切片圖像），透過 media 子元素設定圖像相關的 meta 與連結。
-* conclusion / conclusionCode ： 以文字或可編碼方式提供測試的臨床結論或總結，用於提高理解或自動化決策支援（如結論標籤）。
-* presentedForm ： 提供可下載的完整報告形式（例如 PDF、Word、影像檔等），適合直接呈現在使用者介面或儲存作為法律/醫療文件。
+## 安裝要用到的 NuGet 開發套件
 
-## 🔗 Resource 之間的 Reference 與 Patient 的關連鏈
+因為開發此專案時會用到這些 NuGet 套件，請依照底下說明，將需要用到的 NuGet 套件安裝起來。
 
-在 DiagnosticReport 中，與 Patient 相關或可能有跨資源 Reference 的欄位包括：
+### 安裝 Hl7.Fhir.R4 套件
 
-* **subject** → Patient（最直接）
-* **encounter** → Encounter（此欄位中 Encounter 通常也含有對 Patient 的 reference）
-* **specimen** → Specimen（Specimen 通常會 reference Patient/Encounter）
-* **result** → Observation（Observation 通常 reference Patient）
-* **basedOn** → 可能 reference ServiceRequest 或其他 request，這些 request 也會 reference Patient
-* **performer / resultsInterpreter** → 可能 reference Practitioner / Organization，但這些角色通常也有關聯 Patient 通常不直接 reference
-* **imagingStudy** → ImagingStudy 內部也 reference Patient 以表明影像結果是針對誰執行的
+這個套件是用來處理 FHIR R4 版本的資源物件，並且提供了與 FHIR Server 進行互動的功能。這裡是該套件提供功能的主要清單：
+* FHIR 資源物件模型：提供了對 FHIR R4 版本的資源物件模型的定義，讓開發者可以使用這些物件來表示和操作 FHIR 資源。
+* FHIR 客戶端功能：提供了與 FHIR Server 進行互動的功能，包括發出請求、接收回應、處理錯誤等。
 
-因此，從 DiagnosticReport → subject → Patient → Observation / Encounter / Specimen / ImagingStudy，可以建立一條臨床事件詳細鏈結的資料關係圖.
+請依照底下說明操作步驟，將這個套件安裝到專案內
 
-DiagnosticReport 是用來描述診斷報告的資源，它可以包含多個 Observation 作為結果，並且可以有一個或多個圖片或其他附件作為報告的呈現形式。在這裡，我們會把 AI 分析後的六個指標數值寫入到 Observation 內，而把五彩圖片的 URL 參考寫入到 DiagnosticReport 的 presentedForm[] 內。
+* 滑鼠右擊 [方案總管] 視窗內的 [專案節點] 下方的 [相依性] 節點
+* 從彈出功能表清單中，點選 [管理 NuGet 套件] 這個功能選項清單
+* 此時，將會看到 [NuGet: csJsonMerge] 視窗
+* 切換此視窗的標籤頁次到名稱為 [瀏覽] 這個標籤頁次
+* 在左上方找到一個搜尋文字輸入盒，在此輸入 `Hl7.Fhir.R4`
+* 在視窗右方，將會看到該套件詳細說明的內容，其中，右上方有的 [安裝] 按鈕
+* 點選這個 [安裝] 按鈕，將這個套件安裝到專案內
 
-以下是我在開發過程中對於 FHIR DiagnosticReport 資源的操作範例說明。
+## 修改 Program.cs 類別內容
 
-## 建立 主控台應用程式 專案
-* 開啟 Visual Studio 2026
-* 選擇「建立新專案」
-* 在 [建立新專案] 視窗中，在右方清單內，找到並選擇 [主控台應用程式] 項目
-* 然後點擊右下方「下一步」按鈕
-* 此時將會看到 [設定新的專案] 對話窗
-* 在該對話窗的 [專案名稱] 欄位中，輸入專案名稱，例如 "csPatientCRUD"
-* 然後點擊右下方「下一步」按鈕
-* 接著會看到 [其他資訊] 對話窗
-* 在這個對話窗內，確認使用底下的選項
-    * 架構：.NET 10.0 (或更新版本)
-    * 勾選 不要使用最上層陳述式 (這是我的個人習慣)
-* 然後點擊右下方「建立」按鈕
-* 現在，已經完成了這個 主控台應用程式 專案的建立
-
-## 安裝 Hl7.Fhir.R4 套件
-
-* 在 Visual Studio 的「方案總管」視窗中，右鍵點擊專案名稱
-* 從右鍵選單中，選擇「管理 NuGet 套件」
-* 在 NuGet 套件管理器視窗中，切換到「瀏覽」標籤頁
-* 在搜尋框中，輸入 "Hl7.Fhir.R4" 並按下 Enter 鍵
-* 從搜尋結果中，找到 "Hl7.Fhir.R4" 套件 並點擊它
-* 在這裡的範例中，使用該套件的版本為 5.12.1
-* 在右側的詳細資訊面板中，點擊「安裝」按鈕
-
-## 撰寫程式碼
-* 打開 Program.cs 檔案，並將其內容替換為以下程式碼：
+* 在專案中找到並且打開 [Program.cs] 檔案
+* 將底下的程式碼取代掉 `Program.cs` 檔案中內容
 
 ```csharp
 using Hl7.Fhir.Model;
 using Hl7.Fhir.Rest;
 
-namespace csDiagnosticReport;
+namespace csObservation;
 
 internal class Program
 {
-    private const string FhirBaseUrl = "http://10.1.1.113:8080/fhir";
-
-    private const string CsBodyComp = "https://example.org/fhir/CodeSystem/body-composition";
-    private const string CsObsCategory = "http://terminology.hl7.org/CodeSystem/observation-category";
-    private const string CsV2_0074 = "http://terminology.hl7.org/CodeSystem/v2-0074";
-    private const string Ucum = "http://unitsofmeasure.org";
-    private const string patientId = "test-patient-001"; // 固定的 Patient ID
-    private const string AIResultImageUrl = "http://localhost/result/2311";
-    static async System.Threading.Tasks.Task Main(string[] args)
+    static void Main(string[] args)
     {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var ct = cts.Token;
+        var fhirBaseUrl = "http://10.1.1.113:8080/fhir"; 
+        var patientId = "01707a0c-9619-ccba-695a-b270744d76c2"; 
+        var startDate = new DateTimeOffset(2014, 01, 01, 0, 0, 0, TimeSpan.FromHours(8));
+        var endDate = new DateTimeOffset(2024, 12, 31, 23, 59, 59, TimeSpan.FromHours(8));
 
-        var client = CreateFhirClient(FhirBaseUrl);
-
-        var patient = await CreateTestPatientAsync(client, ct);
-        Console.WriteLine($"Selected Patient: {patient.Id}");
-
-        // 準備六個指標數值（示範：你可改成實際推論結果）
-        // SMI: cm2/m2, SMD: HU, 其餘: cm2
-        var effectiveTime = DateTimeOffset.Now;
-
-        var smi = 29.42m;
-        var smd = 39.50m;
-        var imat = 11.69m;
-        var lama = 20.93m;
-        var nama = 69.16m;
-        var myosteatosis = 32.62m;
-
-        // 建立 Observation + DiagnosticReport，並 Transaction 寫入
-        var transaction = BuildTransactionBundle(
-            patientId: patient.Id,
-            effectiveTime: effectiveTime,
-            imageUrl: AIResultImageUrl,
-            smi: smi,
-            smd: smd,
-            imat: imat,
-            lama: lama,
-            nama: nama,
-            myosteatosis: myosteatosis
-        );
-
-        var response = await client.TransactionAsync(transaction, ct);
-
-        // 從回應 Bundle 取出 server 指派的資源 id（如果 server 有回傳）
-        // 有些 server 會把 location 放在 entry.response.location
-        Console.WriteLine("Transaction completed.");
-        foreach (var entry in response.Entry)
-        {
-            var loc = entry.Response?.Location ?? "(no location)";
-            Console.WriteLine($"- {entry.Resource?.TypeName ?? "(no resource)"} => {loc}");
-        }
-
-        await DeletePatientAndRelatedResourcesAsync(client, patient.Id, ct);
-    }
-
-    private static async System.Threading.Tasks.Task DeletePatientAndRelatedResourcesAsync(
-        FhirClient client,
-        string patientId,
-        CancellationToken ct)
-    {
-        Console.WriteLine($"開始刪除 Patient ID: {patientId} 及其相關資源...");
-
-        var deleteEntries = new List<Bundle.EntryComponent>();
-
-        try
-        {
-            var obsBundle = await client.SearchAsync<Observation>(
-                new[] { $"subject=Patient/{patientId}" },
-                ct: ct);
-
-            if (obsBundle?.Entry != null)
-            {
-                foreach (var entry in obsBundle.Entry)
-                {
-                    if (entry.Resource is Observation obs && !string.IsNullOrEmpty(obs.Id))
-                    {
-                        deleteEntries.Add(new Bundle.EntryComponent
-                        {
-                            Request = new Bundle.RequestComponent
-                            {
-                                Method = Bundle.HTTPVerb.DELETE,
-                                Url = $"Observation/{obs.Id}"
-                            }
-                        });
-                        Console.WriteLine($"- 標記刪除 Observation: {obs.Id}");
-                    }
-                }
-            }
-
-            var drBundle = await client.SearchAsync<DiagnosticReport>(
-                new[] { $"subject=Patient/{patientId}" },
-                ct: ct);
-
-            if (drBundle?.Entry != null)
-            {
-                foreach (var entry in drBundle.Entry)
-                {
-                    if (entry.Resource is DiagnosticReport dr && !string.IsNullOrEmpty(dr.Id))
-                    {
-                        deleteEntries.Add(new Bundle.EntryComponent
-                        {
-                            Request = new Bundle.RequestComponent
-                            {
-                                Method = Bundle.HTTPVerb.DELETE,
-                                Url = $"DiagnosticReport/{dr.Id}"
-                            }
-                        });
-                        Console.WriteLine($"- 標記刪除 DiagnosticReport: {dr.Id}");
-                    }
-                }
-            }
-
-            deleteEntries.Add(new Bundle.EntryComponent
-            {
-                Request = new Bundle.RequestComponent
-                {
-                    Method = Bundle.HTTPVerb.DELETE,
-                    Url = $"Patient/{patientId}"
-                }
-            });
-            Console.WriteLine($"- 標記刪除 Patient: {patientId}");
-
-            if (deleteEntries.Count > 0)
-            {
-                var deleteBundle = new Bundle
-                {
-                    Type = Bundle.BundleType.Transaction,
-                    Entry = deleteEntries
-                };
-
-                var response = await client.TransactionAsync(deleteBundle, ct);
-                Console.WriteLine($"成功刪除 {deleteEntries.Count} 筆資源");
-
-                foreach (var entry in response.Entry)
-                {
-                    var status = entry.Response?.Status ?? "unknown";
-                    var location = entry.Response?.Location ?? "unknown";
-                    Console.WriteLine($"  - {location}: {status}");
-                }
-            }
-            else
-            {
-                Console.WriteLine("未找到需要刪除的資源");
-            }
-        }
-        catch (FhirOperationException ex)
-        {
-            Console.Error.WriteLine($"刪除失敗: {ex.Message}");
-            Console.Error.WriteLine($"Status: {ex.Status}");
-            throw;
-        }
-    }
-
-    private static FhirClient CreateFhirClient(string baseUrl)
-    {
-        var settings = new FhirClientSettings
+        var clientSettings = new FhirClientSettings
         {
             PreferredFormat = ResourceFormat.Json,
-            VerifyFhirVersion = true,
-            ReturnPreference = ReturnPreference.Representation
+            Timeout = 60_000,
+            VerifyFhirVersion = false 
         };
 
-        return new FhirClient(baseUrl, settings);
-    }
-
-
-    private static async Task<Patient> CreateTestPatientAsync(FhirClient client, CancellationToken ct)
-    {
+        FhirClient client;
         try
         {
-            var patient = new Patient
-            {
-                Id = patientId,
-                Active = true,
-                Name =
-                {
-                    new HumanName
-                    {
-                        Use = HumanName.NameUse.Official,
-                        Family = "測試",
-                        Given = new[] { "病患", "範例" }
-                    }
-                },
-                Gender = AdministrativeGender.Male,
-                BirthDate = "1980-01-01",
-                Telecom =
-                {
-                    new ContactPoint
-                    {
-                        System = ContactPoint.ContactPointSystem.Phone,
-                        Value = "0912-345-678",
-                        Use = ContactPoint.ContactPointUse.Mobile
-                    }
-                }
-            };
-
-            var createdPatient = await client.UpdateAsync(patient);
-            Console.WriteLine($"已建立病患: {createdPatient.Id}");
-            return createdPatient;
+            // 確保 Base Url 合法且有結尾斜線
+            var baseUri = new Uri(fhirBaseUrl.TrimEnd('/') + "/");
+            client = new FhirClient(baseUri, clientSettings);
         }
-        catch (FhirOperationException ex)
+        catch (Exception ex)
         {
-            Console.WriteLine($"無法建立/更新病患: {ex.Message}");
-            throw;
+            Console.WriteLine($"建立 FhirClient 失敗，請檢查 fhirBaseUrl 設定：{ex.Message}");
+            return;
         }
 
-        throw new InvalidOperationException("無法建立或取得 Patient");
-    }
-    
-    private static Bundle BuildTransactionBundle(
-        string patientId,
-        DateTimeOffset effectiveTime,
-        string imageUrl,
-        decimal smi,
-        decimal smd,
-        decimal imat,
-        decimal lama,
-        decimal nama,
-        decimal myosteatosis)
-    {
-        var patientRef = new ResourceReference($"Patient/{patientId}");
+        var searchParams = new SearchParams()
+            .Where($"subject=Patient/{patientId}")
+            .Where($"date=ge{startDate:yyyy-MM-dd}")
+            .Where($"date=le{endDate:yyyy-MM-dd}")
+            .OrderBy("-date")      // 「-欄位」代表 desc
+            .LimitTo(100);  
 
-        var obsFullUrl = $"urn:uuid:{Guid.NewGuid()}";
-        var drFullUrl = $"urn:uuid:{Guid.NewGuid()}";
+        // 你可以視需求 include 參考資源（伺服器要支援）
+        // Observation 常見 include:
+        // - subject (Patient)  encounter  performer  specimen  device
+        // 注意：include 太多可能很慢，真正在產品通常會分開查或做快取
+        // 新版 API 的 Include 集合需要指定 IncludeModifier，這裡使用 None
+        searchParams.Include.Add(("Observation:subject", IncludeModifier.None));
+        searchParams.Include.Add(("Observation:encounter", IncludeModifier.None));
+        searchParams.Include.Add(("Observation:performer", IncludeModifier.None));
+        searchParams.Include.Add(("Observation:specimen", IncludeModifier.None));
+        searchParams.Include.Add(("Observation:device", IncludeModifier.None));
 
-        var obs = BuildObservation(patientRef, effectiveTime, smi, smd, imat, lama, nama, myosteatosis);
-        var dr = BuildDiagnosticReport(patientRef, effectiveTime, obsFullUrl, imageUrl);
+        Bundle bundle = client.Search<Observation>(searchParams);
 
-        return new Bundle
+        Console.WriteLine($"FHIR Base: {fhirBaseUrl}");
+        Console.WriteLine($"Patient: Patient/{patientId}");
+        Console.WriteLine($"Range: {startDate:yyyy-MM-dd} ~ {endDate:yyyy-MM-dd}");
+        Console.WriteLine(new string('-', 80));
+
+        int row = 0;
+        foreach (var entry in bundle.Entry.Where(e => e.Resource is Observation))
         {
-            Type = Bundle.BundleType.Transaction,
-            Entry =
+            var obs = (Observation)entry.Resource;
+            row++;
+
+            Console.WriteLine($"[{row}] Observation/{obs.Id}");
+            Console.WriteLine($"Status: {obs.Status}  |  Category: {FormatCodeableConcepts(obs.Category)}");
+            Console.WriteLine($"Code: {FormatCodeableConcept(obs.Code)}");
+            Console.WriteLine($"Effective: {FormatEffective(obs.Effective)}");
+
+            // 值與單位
+            Console.WriteLine($"Value: {FormatValue(obs.Value)}");
+            if (obs.ReferenceRange?.Any() == true)
             {
-                NewPostEntry(obsFullUrl, "Observation", obs),
-                NewPostEntry(drFullUrl, "DiagnosticReport", dr)
+                Console.WriteLine($"ReferenceRange: {FormatReferenceRanges(obs.ReferenceRange)}");
             }
-        };
-    }
 
-    private static Bundle.EntryComponent NewPostEntry(string fullUrl, string url, Resource resource) =>
-        new Bundle.EntryComponent
+            // 這筆 Observation 參考到哪些 Resource（如果有 include 的話，這些參考資源會被一起抓回來）
+            Console.WriteLine($"Subject: {FormatRef(obs.Subject)}"); // 幾乎一定是 Patient（或 Group/Device）
+            Console.WriteLine($"Encounter: {FormatRef(obs.Encounter)}"); // 常用：連回就醫事件
+            Console.WriteLine($"Performer: {FormatRefs(obs.Performer)}"); // 可能是 Practitioner / PractitionerRole / Organization / CareTeam / Patient / Device
+            Console.WriteLine($"Specimen: {FormatRef(obs.Specimen)}"); // 檢體 (laboratory 常見)
+            Console.WriteLine($"Device: {FormatRef(obs.Device)}"); // 量測儀器或系統
+            Console.WriteLine($"BasedOn: {FormatRefs(obs.BasedOn)}"); // ServiceRequest / MedicationRequest / CarePlan ...
+            Console.WriteLine($"PartOf: {FormatRefs(obs.PartOf)}"); // Procedure / MedicationAdministration / ImagingStudy ...
+            Console.WriteLine($"HasMember: {FormatRefs(obs.HasMember)}"); // Panel/Group
+            Console.WriteLine($"DerivedFrom: {FormatRefs(obs.DerivedFrom)}"); // 由其他 Observation/DocumentReference/ImagingStudy 派生
+
+            // Coding system / 資料分類推論
+            Console.WriteLine($"CodingSystems(code): {ListCodingSystems(obs.Code)}");
+            var categorySystemsStr = obs.Category == null
+                ? string.Empty
+                : string.Join(", ", obs.Category.Select(ListCodingSystems));
+            Console.WriteLine($"CodingSystems(category): {categorySystemsStr}");
+            Console.WriteLine($"LikelyDomainHint: {InferDomainHint(obs)}");
+
+            Console.WriteLine(new string('-', 80));
+        }
+
+        // 若有下一頁
+        while (bundle.NextLink != null)
         {
-            FullUrl = fullUrl,
-            Resource = resource,
-            Request = new Bundle.RequestComponent
+            bundle = client.Continue(bundle, PageDirection.Next);
+            foreach (var entry in bundle.Entry.Where(e => e.Resource is Observation))
             {
-                Method = Bundle.HTTPVerb.POST,
-                Url = url
+                // 在這裡簡化僅查看最前面 100 筆
             }
-        };
-
-    private static Observation BuildObservation(
-        ResourceReference patientRef,
-        DateTimeOffset effectiveTime,
-        decimal smi,
-        decimal smd,
-        decimal imat,
-        decimal lama,
-        decimal nama,
-        decimal myosteatosis)
-    {
-        var obs = new Observation
-        {
-            Status = ObservationStatus.Final,
-            Subject = patientRef,
-            Effective = new FhirDateTime(effectiveTime),
-            Category =
-            {
-                new CodeableConcept(CsObsCategory, "imaging", "Imaging", null)
-            },
-            Code = new CodeableConcept(CsBodyComp, "body-composition-summary", "Body composition AI summary", null),
-        };
-
-        // 6 個 component：你指定的做法
-        obs.Component.Add(Component("SMI", "骨骼肌指標 (SMI)", Quantity(smi, "cm2/m2", Ucum, "cm2/m2")));
-        obs.Component.Add(Component("SMD", "骨骼肌密度 (SMD)", new Quantity { Value = smd, Unit = "HU" }));
-        obs.Component.Add(Component("IMAT", "肌間/肌內脂肪組織 (IMAT)", Quantity(imat, "cm2", Ucum, "cm2")));
-        obs.Component.Add(Component("LAMA", "低密度肌肉區域 (LAMA)", Quantity(lama, "cm2", Ucum, "cm2")));
-        obs.Component.Add(Component("NAMA", "正常密度肌肉區域 (NAMA)", Quantity(nama, "cm2", Ucum, "cm2")));
-        obs.Component.Add(Component("MYOSTEATOSIS", "肌肉脂肪變性 (Myosteatosis)", Quantity(myosteatosis, "cm2", Ucum, "cm2")));
-
-        return obs;
+        }
     }
 
-    private static DiagnosticReport BuildDiagnosticReport(
-        ResourceReference patientRef,
-        DateTimeOffset effectiveTime,
-        string observationFullUrl,
-        string imageUrl)
+    static string FormatEffective(DataType? effective)
     {
-        var diagnosticReport = new DiagnosticReport
+        return effective switch
         {
-            Status = DiagnosticReport.DiagnosticReportStatus.Final,
-            Subject = patientRef,
-            Effective = new FhirDateTime(effectiveTime),
-            Category =
-            {
-                new CodeableConcept(CsV2_0074, "RAD", "Radiology", null)
-            },
-            Code = new CodeableConcept(CsBodyComp, "bodycomp-ai-report", "Body composition AI report", null),
-            Result =
-            {
-                new ResourceReference(observationFullUrl)
-            }
+            FhirDateTime dt => dt.Value,
+            Period p => $"{p.Start} ~ {p.End}",
+            Timing t => "Timing(...)",
+            Instant i => i.Value?.ToString("O") ?? "",
+            _ => effective?.TypeName ?? ""
         };
-
-        diagnosticReport.PresentedForm.Add(new Attachment
-        {
-            ContentType = "image/png",
-            Title = "Segmentation overlay",
-            Url = imageUrl
-        });
-
-        return diagnosticReport;
     }
 
-    private static Observation.ComponentComponent Component(string code, string text, Quantity qty) =>
-        new Observation.ComponentComponent
+    static string FormatValue(DataType? value)
+    {
+        if (value == null) return "(no value)";
+        return value switch
         {
-            Code = new CodeableConcept(CsBodyComp, code, text, null),
-            Value = qty
+            Quantity q => $"{q.Value} {q.Unit} (system={q.System}, code={q.Code})",
+            CodeableConcept cc => FormatCodeableConcept(cc),
+            FhirString s => s.Value,
+            FhirBoolean b => b.Value?.ToString() ?? "",
+            Integer i => i.Value?.ToString() ?? "",
+            Hl7.Fhir.Model.Range r => $"{FormatValue(r.Low)} ~ {FormatValue(r.High)}",
+            Ratio ratio => $"{FormatValue(ratio.Numerator)} / {FormatValue(ratio.Denominator)}",
+            SampledData sd => $"SampledData(points={sd.Data?.Split(' ').Length ?? 0}, unit={sd.Origin?.Unit})",
+            Attachment a => $"Attachment(contentType={a.ContentType}, url={a.Url})",
+            _ => $"{value.TypeName}"
         };
+    }
 
-    private static Quantity Quantity(decimal value, string unit, string system, string code) =>
-        new Quantity
+    static string FormatReferenceRanges(List<Observation.ReferenceRangeComponent> ranges)
+    {
+        return string.Join(" | ", ranges.Select(r =>
         {
-            Value = value,
-            Unit = unit,
-            System = system,
-            Code = code
-        };
+            var low = r.Low != null ? $"{r.Low.Value} {r.Low.Unit}" : "";
+            var high = r.High != null ? $"{r.High.Value} {r.High.Unit}" : "";
+            var text = r.Text ?? "";
+            var type = r.Type != null ? FormatCodeableConcept(r.Type) : "";
+            return $"[{low}~{high}] {text} {type}".Trim();
+        }));
+    }
+
+    static string FormatCodeableConcept(CodeableConcept? cc)
+    {
+        if (cc == null) return "(none)";
+        var text = !string.IsNullOrWhiteSpace(cc.Text) ? cc.Text : "";
+        var codings = cc.Coding?.Select(c => $"{c.System}|{c.Code}{(string.IsNullOrWhiteSpace(c.Display) ? "" : $" ({c.Display})")}") ?? Enumerable.Empty<string>();
+        return $"{text}  =>  {string.Join(", ", codings)}".Trim();
+    }
+
+    static string FormatCodeableConcepts(IEnumerable<CodeableConcept>? ccs)
+        => ccs == null ? "(none)" : string.Join(" ; ", ccs.Select(FormatCodeableConcept));
+
+    static string FormatRef(ResourceReference? r)
+        => r == null ? "(none)" : $"{r.Reference}{(string.IsNullOrWhiteSpace(r.Display) ? "" : $" ({r.Display})")}";
+
+    static string FormatRefs(IEnumerable<ResourceReference>? rs)
+        => rs == null ? "(none)" : string.Join(", ", rs.Select(FormatRef));
+
+    static string ListCodingSystems(CodeableConcept? cc)
+    {
+        if (cc?.Coding == null || cc.Coding.Count == 0) return "(none)";
+        return string.Join(", ", cc.Coding.Where(c => !string.IsNullOrWhiteSpace(c.System)).Select(c => c.System).Distinct());
+    }
+
+    static string InferDomainHint(Observation obs)
+    {
+        // 1) category 常用：vital-signs/laboratory/imaging/social-history
+        var categorySystems = obs.Category?
+            .SelectMany(c => c.Coding ?? new List<Coding>())
+            .Where(c => c.System == "http://terminology.hl7.org/CodeSystem/observation-category")
+            .Select(c => c.Code)
+            .Where(c => !string.IsNullOrWhiteSpace(c))
+            .Distinct()
+            .ToList() ?? new List<string>();
+
+        if (categorySystems.Contains("vital-signs"))
+            return "Likely Vital Signs (often recorded by nursing devices/staff); units usually UCUM.";
+        if (categorySystems.Contains("laboratory"))
+            return "Likely Laboratory result (often from LIS); specimen commonly present; code usually LOINC; units often UCUM.";
+        if (categorySystems.Contains("imaging"))
+            return "Likely Imaging-related observation (may be derivedFrom ImagingStudy/DiagnosticReport).";
+        if (categorySystems.Contains("social-history"))
+            return "Likely Social History (e.g., smoking, alcohol).";
+
+        // 2) specimen 有時可視為檢驗/病理類訊號
+        if (obs.Specimen != null)
+            return "Specimen present -> often lab/pathology workflow.";
+
+        // 3) performer 是 Organization / PractitionerRole 時，常用來推測科室/檢驗單位
+        if (obs.Performer?.Any(p => p.Reference != null && p.Reference.StartsWith("Organization/")) == true)
+            return "Performer includes Organization -> may indicate department/lab organization.";
+
+        return "No strong hint; use category + code system + performer/specimen to classify.";
+    }
 }
 ```
 
-程式一開始定義了一些常數，例如 FHIR 伺服器的基底 URL，以及一些 CodeSystem URL 和單位系統 URL。[FhirBaseUrl] 是 FHIR 伺服器的基底 URL， http://10.1.1.113:8080/fhir 。另外，這裡也定義了一些常數字串，這裡有 CsBodyComp 是一個自訂的 CodeSystem URL，用來定義身體組成相關的 code；CsObsCategory 是觀察類別的 CodeSystem URL；CsV2_0074 是診斷報告類別的 CodeSystem URL；Ucum 是單位系統的 URL。patientId 是一個固定的 Patient ID，這裡設定為 "test-patient-001"。AIResultImageUrl 是 AI 推論結果圖片的 URL，這裡設定為 "http://localhost/result/2311"。
+這個程式一開始將會宣告四個變數，分別是 `fhirBaseUrl`、`patientId`、`startDate` 以及 `endDate`，這些變數分別用來設定 FHIR Server 的 URL、病人 ID，以及查詢的日期範圍。因此，這個範例程式碼，將會針對特定的病患與在特定的日期範圍內，去查詢 Observation 資源。
 
-在系統進入點的 [Main] 方法中，首先建立了一個 CancellationTokenSource，設定了 30 秒的逾時時間，也就是接下來的所有程式碼若在30秒內未完成，將會取消操作，接著取得 CancellationToken。接著，使用 CreateFhirClient 方法建立了一個 FhirClient 實例，並傳入 FHIR 伺服器的基底 URL。這樣子就已經完成的相關準備工作。
+使用 [FhirClientSettings] 物件來設定 FHIR Client 的一些行為，例如：PreferredFormat、Timeout、VerifyFhirVersion 等等，這些設定會影響到後續與 FHIR Server 互動的方式。其中，PreferredFormat 設定為 ResourceFormat.Json，表示希望以 JSON 格式來與 FHIR Server 進行資料交換；Timeout 設定為 60 秒，表示如果與 FHIR Server 的互動超過這個時間，就會觸發逾時錯誤；VerifyFhirVersion 設定為 false，表示不強制檢查 FHIR Server 的版本相容性。
 
-現在要來做第一個動作，就是建立一個病患資源，這裡使用了 CreateTestPatientAsync 方法來建立一個病患，並且傳入 FhirClient 實例和 CancellationToken。
+接下來建立一個 [FhirClient] 實例，這個實例物件將會作為要與 FHIR 發送請求的需求。
 
-在這個 [CreateTestPatientAsync] 方法內，首先建立了一個 Patient 物件，並且設定了它的 Id、Active 狀態、Name、Gender、BirthDate 和 Telecom 等欄位(因為這是一個測試用的 Patient 紀錄，這裡的相關欄位值，都是隨機設定的)。不過，這裡的 Id 是固定的 "test-patient-001"，這樣子在每次執行程式時，都會使用同一個 Patient ID，當然，在程式快要結束執行之後，便可以把關於這個病患的相關紀錄都刪除掉。
+[SearchParams] 物件用來設定要查詢 Observation 資源的條件，這裡設定了以下條件：
+- subject=Patient/{patientId}：表示要查詢關於特定病人的 Observation 資源
+- date=ge{startDate:yyyy-MM-dd}：表示要查詢在 startDate 之後（包含 startDate）的 Observation 資源
+- date=le{endDate:yyyy-MM-dd}：表示要查詢在 endDate 之前（包含 endDate）的 Observation 資源
+- OrderBy("-date")：表示要按照日期降冪排序（最新的在前面）
+- LimitTo(100)：表示最多只查詢 100 筆符合條件的 Observation 資源
 
-接著，使用 FhirClient 的 UpdateAsync 方法來建立或更新這個病患資源。UpdateAsync 方法會根據傳入的 Patient 物件的 Id 來決定是要建立一個新的資源還是更新已存在的資源。如果該 Id 的資源不存在，則會建立一個新的資源；如果該 Id 的資源已經存在，則會更新該資源。這裡的做法是利用 UpdateAsync 的特性來確保每次執行程式時，都能夠得到同一個 Patient 資源。
+這個 [SearchParams] 物件還有其他的用法，這包括了可以使用 [Include] 來指定要包含哪些相關資源，例如：Observation:subject、Observation:encounter、Observation:performer、Observation:specimen、Observation:device 等等，這些參數會讓 FHIR Server 在回應時，一次性將這些相關資源也包含在回應的 Bundle 中，這樣就不需要再額外發出多次請求來取得這些相關資源的資料。還有一些其他的參數，例如：_elements 可以用來指定要回應哪些欄位，_summary 可以用來指定要回應資源的哪個摘要層級（例如：true、text、data、count），這些參數可以幫助我們優化查詢的效率與回應的大小。
 
-回到 [Main] 方法內，當成功建立或取得病患資源之後，會印出該病患的 Id。接著，準備六個指標數值，這些數值是示範用的，當要把這些程式碼修改成為實際的 SMART App 需要用的時候，這裡將會採用實際推論結果。這裡的指標包括 SMI、SMD、IMAT、LAMA、NAMA 和 MYOSTEATOSIS，每個指標都有一個對應的數值。這六個指標的意義分別為：
-* SMI: 骨骼肌指標 (Skeletal Muscle Index)，單位為 cm2/m2
-* SMD: 骨骼肌密度 (Skeletal Muscle Density)，單位為 HU (Hounsfield Units)
-* IMAT: 肌間/肌內脂肪組織 (Intermuscular Adipose Tissue)，單位為 cm2
-* LAMA: 低密度肌肉區域 (Low Attenuation Muscle Area)，單位為 cm2
-* NAMA: 正常密度肌肉區域 (Normal Attenuation Muscle Area)，單位為 cm2
-* MYOSTEATOSIS: 肌肉脂肪變性 (Myosteatosis)，單位為 cm2
+對於 [searchParams.Include.Add] 方法，其功能與目的在於指定在查詢 Observation 資源時，要同時包含哪些相關資源。這裡的參數是以 "Observation:subject"、"Observation:encounter"、"Observation:performer"、"Observation:specimen"、"Observation:device" 的格式來指定要包含的相關資源，這些參數會告訴 FHIR Server 在回應時，一次性將這些相關資源也包含在回應的 Bundle 中，這樣就不需要再額外發出多次請求來取得這些相關資源的資料。而第二個參數為 IncludeModifier.None，表示不使用任何特殊的 include 修飾符，這是 FHIR API 中的一種用法，表示要包含的資源是直接相關的，而不是透過某些特殊的關聯方式。
 
-接著，使用 BuildTransactionBundle 方法來建立一個 Transaction Bundle，這個 Bundle 內會包含一個 Observation 資源和一個 DiagnosticReport 資源，並且這兩個資源都會 reference 到剛剛建立的 Patient 資源。Observation 內會包含這六個指標數值，而 DiagnosticReport 內會包含對 Observation 的 reference，以及圖片的 URL 參考。
+一旦都設定完成，這裡使用了 [client.Search<Observation>(searchParams)] 方法來發出查詢請求，這個方法會根據我們設定的條件來查詢 Observation 資源，並且回傳一個包含符合條件的 Observation 資源的 Bundle。接下來程式碼中會對這個 Bundle 進行處理，將其中的 Observation 資源以及相關資源的資料顯示在主控台視窗內。這個方法呼叫，將會得到一個 `Bundle bundle` 物件，這個物件包含了查詢結果的 Observation 資源以及相關資源的資料
 
-在這個 [BuildTransactionBundle] 方法內，首先建立了一個 ResourceReference，指向 Patient/{patientId}，這樣子就可以在 Observation 和 DiagnosticReport 內 reference 到這個病患。
+接下來程式碼中會對這個 Bundle 進行處理，在此使用了 `bundle.Entry.Where(e => e.Resource is Observation)`敘述，這個敘述會從 Bundle 的 Entry 中過濾出 Resource 是 Observation 的項目，然後對每一個符合條件的 Entry 進行處理。
 
-接著，對於 [obsFullUrl] & [drFullUrl] 分別將會用來在 Transaction Bundle 內作為 Observation 和 DiagnosticReport 的 fullUrl，這裡使用了 urn:uuid 的方式來產生一個唯一的 fullUrl，這樣子在 Transaction Bundle 內就可以互相 reference，而不需要事先知道 server 會分配什麼樣的 id。當這個交易成功結束之後，這兩個 Url 將會被 server 替換成實際的資源位置。
+對於 `var obs = (Observation)entry.Resource`這個敘述，則是將 Entry 中的 Resource 強制轉型為 Observation 類型，這樣就可以使用 Observation 類別中定義的屬性和方法來存取 Observation 的資料。
 
-然後，使用 BuildObservation 方法來建立一個 Observation 資源，並且傳入 Patient 的 reference、有效時間、六個指標數值等參數。這個 Observation 內會設定 status、category、code、subject、effective 等欄位，並且在 component[] 內加入六個 component，每個 component 都會有一個 code 和對應的數值。
+透過 obs 物件，可以先取得與顯示出這個 Observation 的 [Category] & [Code] & [Effective]，而 [ReferenceRange] 表示了參考值範圍
 
-在 FHIR 的 Observation 資源中， [Category] 是用來表示這個觀察值的類別，例如實驗室、影像、生命徵象等，這裡設定為 "imaging"。 [Code] 是用來表示這個觀察值的具體內容，這裡設定為 "body-composition-summary"，表示這是一個身體組成的摘要觀察值。 [Subject] 是用來 reference 到這個觀察值所屬的病患，這裡 reference 到剛剛建立的 Patient。 [Effective] 是用來表示這個觀察值的有效時間，這裡設定為目前的時間。
+接著，會把有參考到這個觀察物件的其他資源顯示出來，這包括了 Subject、Encounter、Performer、Specimen、Device、BasedOn、PartOf、HasMember 以及 DerivedFrom 等等，這些都是 Observation 資源中常見的參考欄位，這些欄位通常會指向其他的資源，例如：Patient、Encounter、Practitioner、Organization、ServiceRequest 等等。這些參考資源的資料，會在前面使用 [Include] 參數指定要包含在查詢結果的 Bundle 中。
 
-另外，[Component] 是用來表示這個觀察值的組成部分，這裡加入了六個 component，每個 component 都有一個 code 和對應的數值。這些 component 的 code 都是使用自訂的 CodeSystem URL "https://example.org/fhir/CodeSystem/body-composition" 來定義，這樣子在 FHIR 伺服器內就可以辨識這些 component 的意義。
+在這裡也設計了許多支援方法，用來進一步的將這些觀察物件的詳細資訊，使用格式化的方式來顯示在螢幕上，這些結果可以從底下的執行結果輸出內容，看到各種各種不同屬性的格式化表現方式，底下將會把這些支援方法所做的事情整理出來。
+- FormatEffective：用來格式化 Observation 的 Effective 欄位，這個欄位的型別是 DataType，可以是 FhirDateTime、Period、Timing、Instant 等等，這個方法會根據不同的型別來格式化成適合顯示的字串。
+- FormatValue：用來格式化 Observation 的 Value 欄位，這個欄位的型別也是 DataType，可以是 Quantity、CodeableConcept、FhirString、FhirBoolean、Integer、Range、Ratio、SampledData、Attachment 等等，這個方法會根據不同的型別來格式化成適合顯示的字串。
+- FormatReferenceRanges：用來格式化 Observation 的 ReferenceRange 欄位，這個欄位是一個 List<Observation.ReferenceRangeComponent>，這個方法會將每一個 ReferenceRangeComponent 的 Low、High、Text、Type 等等資訊格式化成適合顯示的字串。
+- FormatCodeableConcept：用來格式化 CodeableConcept 類型的欄位，這個方法會將 CodeableConcept 的 Text 以及 Coding 中的 System、Code、Display 等等資訊格式化成適合顯示的字串。
+- FormatCodeableConcepts：用來格式化多個 CodeableConcept 的欄位，這個方法會將每一個 CodeableConcept 都使用 FormatCodeableConcept 方法來格式化，然後再將它們串接成一個字串。
+- FormatRef：用來格式化 ResourceReference 類型的欄位，這個方法會將 ResourceReference 的 Reference 以及 Display 等等資訊格式化成適合顯示的字串。
+- FormatRefs：用來格式化多個 ResourceReference 的欄位，這個方法會將每一個 ResourceReference 都使用 FormatRef 方法來格式化，然後再將它們串接成一個字串。
+- ListCodingSystems：用來列出 CodeableConcept 中的 Coding 所使用的系統，這個方法會從 CodeableConcept 的 Coding 中過濾出 System 不為空的 Coding，然後將它們的 System 串接成一個字串。
+- InferDomainHint：用來根據 Observation 的屬性來推測這個 Observation 可能屬於哪個臨床領域，這個方法會根據 Category、Specimen、Performer 等等資訊來推測這個 Observation 可能是 Vital Signs、Laboratory、Imaging、Social History 等等。
 
-在 [BuildTransactionBundle] 方法內，接著使用 BuildDiagnosticReport 方法來建立一個 DiagnosticReport 資源，並且傳入 Patient 的 reference、有效時間、Observation 的 fullUrl、圖片的 URL 參考等參數。
+## 執行程式碼
 
-這個 DiagnosticReport 內會設定 status、category、code、subject、effective 等欄位，並且在 result[] 內加入對 Observation 的 reference，透過這樣的設計，當取得了這個診斷報告後，便可以透過 result[] 內的 reference 來取得這個報告所包含的觀察值。
-
-在 presentedForm[] 內加入圖片的 URL 參考。在 FHIR 的 DiagnosticReport 資源中， [Category] 是用來表示這個報告的類別，例如實驗室、影像、病理等，這裡設定為 "RAD" (Radiology)。 [Code] 是用來表示這個報告的具體內容，這裡設定為 "bodycomp-ai-report"，表示這是一個身體組成 AI 報告。 [Subject] 是用來 reference 到這個報告所屬的病患，這裡 reference 到剛剛建立的 Patient。 [Effective] 是用來表示這個報告的有效時間，這裡設定為目前的時間。 [Result] 是用來 reference 到這個報告的觀察值，這裡 reference 到剛剛建立的 Observation。 [PresentedForm] 是用來表示這個報告的呈現形式，這裡加入了一個 Attachment，這個 Attachment 的 contentType 是 "image/png"，title 是 "Segmentation overlay"，url 是圖片的 URL 參考。
-
-最後，透過了 obs & dr 這兩個資源，建立了一個 Transaction Bundle，這個 Bundle 的 type 是 Transaction，並且在 entry[] 內加入了兩個 entry，分別是 Observation 和 DiagnosticReport 的 entry，每個 entry 都有一個 fullUrl 和對應的 resource，以及一個 request component，request component 的 method 是 POST，url 分別是 "Observation" 和 "DiagnosticReport"，表示這兩個資源都是要被建立的。
-
-Bundle內的 type 設定為 Transaction，表示這是一個交易性的 Bundle，當這個 Bundle 被送到 FHIR 伺服器時，伺服器會將這兩個資源當成一個整體來處理。type的值可以是以下幾種：
-* document：表示這是一個文件型的 Bundle，通常用於表示一個完整的醫療文件，例如一個病歷摘要、一個診斷報告等。這種 Bundle 通常會有一個 Composition 資源作為根資源，其他資源則是 Composition 的 component[] 內的 reference。
-* message：表示這是一個訊息型的 Bundle，通常用於表示一個訊息事件，例如一個訂單、一個通知等。這種 Bundle 通常會有一個 MessageHeader 資源作為根資源，其他資源則是 MessageHeader 的 reference。
-* transaction：表示這是一個交易型的 Bundle，當這個 Bundle 被送到 FHIR 伺服器時，伺服器會將這些資源當成一個整體來處理，要麼全部成功，要麼全部失敗。這種 Bundle 通常用於表示一個原子性的操作，例如建立一個病患和相關的觀察值、報告等。
-
-當這個 [BuildTransactionBundle] 方法執行完成後，就會得到一個包含 Observation 和 DiagnosticReport 的 Transaction Bundle。
-
-在 [Main] 方法內，使用 FhirClient 的 TransactionAsync 方法來送出這個 Bundle 到 FHIR 伺服器，這樣子就可以同時建立 Observation 和 DiagnosticReport 這兩個資源，並且它們之間的 reference 也會被正確處理。
-
-最後，當這個交易完成之後，會從回應的 Bundle 內取出 server 指派的資源 id，並且印出來。這裡的做法是從 response.Entry 內的每個 entry 中，取出 entry.Response.Location，這個 Location 通常會包含 server 分配的資源位置，例如 "Observation/123/_history/1" 或 "DiagnosticReport/456/_history/1" 等等。如果 server 沒有回傳 Location，則會印出 "(no location)"。這樣子就可以知道這個交易所建立的資源在 server 上的實際位置，這對於後續的操作，例如更新或刪除這些資源，都會非常有幫助。
-
-由於這是一個模擬測試的練習程式碼，為了下次能夠再度重複執行，在這裡將會呼叫 [DeletePatientAndRelatedResourcesAsync] 方法來刪除剛剛建立的 Patient 以及相關的 Observation 和 DiagnosticReport 資源，這樣子就可以確保每次執行程式時，都能夠從一個乾淨的狀態開始。
-
-# 執行程式
-
-首先先來看這個專案的執行結果：
-
-* 按下 F5 鍵或點擊「開始」按鈕來執行程式
-* 底下為實際操作過程的輸出文字
+* 按下 `F5` 鍵，開始執行這個程式
+* 程式將會開始執行，並且在主控台視窗內，將會看到類似下圖的輸出結果
 
 ```
-已建立病患: test-patient-001
-Selected Patient: test-patient-001
-Transaction completed.
-- Observation => Observation/132801/_history/1
-- DiagnosticReport => DiagnosticReport/132802/_history/1
-開始刪除 Patient ID: test-patient-001 及其相關資源...
-- 標記刪除 Observation: 132801
-- 標記刪除 DiagnosticReport: 132802
-- 標記刪除 Patient: test-patient-001
-成功刪除 3 筆資源
-  - Observation/132801/_history/2: 204 No Content
-  - DiagnosticReport/132802/_history/2: 204 No Content
-  - Patient/test-patient-001/_history/8: 204 No Content
+FHIR Base: http://10.1.1.113:8080/fhir
+Patient: Patient/01707a0c-9619-ccba-695a-b270744d76c2
+Range: 2014-01-01 ~ 2024-12-31
+--------------------------------------------------------------------------------
+[1] Observation/40038ea0-606c-4fad-5901-7f93e51163b4
+Status: Final  |  Category: =>  http://terminology.hl7.org/CodeSystem/observation-category|survey (Survey)
+Code: Patient Health Questionnaire 2 item (PHQ-2) total score [Reported]  =>  http://loinc.org|55758-7 (Patient Health Questionnaire 2 item (PHQ-2) total score [Reported])
+Effective: 2022-06-07T11:31:43-04:00
+Value: 1 {score} (system=http://unitsofmeasure.org, code={score})
+Subject: Patient/01707a0c-9619-ccba-695a-b270744d76c2
+Encounter: Encounter/fcb63ed7-d6b3-b3cf-9671-ce99c8a5e033
+Performer:
+Specimen: (none)
+Device: (none)
+BasedOn:
+PartOf:
+HasMember:
+DerivedFrom:
+CodingSystems(code): http://loinc.org
+CodingSystems(category): http://terminology.hl7.org/CodeSystem/observation-category
+LikelyDomainHint: No strong hint; use category + code system + performer/specimen to classify.
+--------------------------------------------------------------------------------
+[2] Observation/bfd6a17b-5e25-8cab-91e9-600016493e2b
+Status: Final  |  Category: =>  http://terminology.hl7.org/CodeSystem/observation-category|survey (Survey)
+Code: Total score [HARK]  =>  http://loinc.org|76504-0 (Total score [HARK])
+Effective: 2022-06-07T10:52:57-04:00
+Value: 0 {score} (system=http://unitsofmeasure.org, code={score})
+Subject: Patient/01707a0c-9619-ccba-695a-b270744d76c2
+Encounter: Encounter/fcb63ed7-d6b3-b3cf-9671-ce99c8a5e033
+Performer:
+Specimen: (none)
+Device: (none)
+BasedOn:
+PartOf:
+HasMember:
+DerivedFrom:
+CodingSystems(code): http://loinc.org
+CodingSystems(category): http://terminology.hl7.org/CodeSystem/observation-category
+LikelyDomainHint: No strong hint; use category + code system + performer/specimen to classify.
+--------------------------------------------------------------------------------
+
+... (以下省略部分輸出結果) ...
+
+--------------------------------------------------------------------------------
+[99] Observation/137d9d6b-b96d-57fa-c668-fd1edf2e1214
+Status: Final  |  Category: =>  http://terminology.hl7.org/CodeSystem/observation-category|laboratory (Laboratory)
+Code: Lymphocytes [#/volume] in Blood by Automated count  =>  http://loinc.org|731-0 (Lymphocytes [#/volume] in Blood by Automated count)
+Effective: 2020-12-02T09:24:10-05:00
+Value: 1.1834 10*3/uL (system=http://unitsofmeasure.org, code=10*3/uL)
+Subject: Patient/01707a0c-9619-ccba-695a-b270744d76c2
+Encounter: Encounter/1ae31462-f120-b60d-6067-d8b43657986c
+Performer:
+Specimen: (none)
+Device: (none)
+BasedOn:
+PartOf:
+HasMember:
+DerivedFrom:
+CodingSystems(code): http://loinc.org
+CodingSystems(category): http://terminology.hl7.org/CodeSystem/observation-category
+LikelyDomainHint: Likely Laboratory result (often from LIS); specimen commonly present; code usually LOINC; units often UCUM.
+--------------------------------------------------------------------------------
+[100] Observation/358abffd-1da0-793c-0809-66cc078aae12
+Status: Final  |  Category: =>  http://terminology.hl7.org/CodeSystem/observation-category|laboratory (Laboratory)
+Code: Urea nitrogen [Mass/volume] in Serum or Plasma  =>  http://loinc.org|3094-0 (Urea nitrogen [Mass/volume] in Serum or Plasma)
+Effective: 2020-12-02T09:24:10-05:00
+Value: 17.86 mg/dL (system=http://unitsofmeasure.org, code=mg/dL)
+Subject: Patient/01707a0c-9619-ccba-695a-b270744d76c2
+Encounter: Encounter/1ae31462-f120-b60d-6067-d8b43657986c
+Performer:
+Specimen: (none)
+Device: (none)
+BasedOn:
+PartOf:
+HasMember:
+DerivedFrom:
+CodingSystems(code): http://loinc.org
+CodingSystems(category): http://terminology.hl7.org/CodeSystem/observation-category
+LikelyDomainHint: Likely Laboratory result (often from LIS); specimen commonly present; code usually LOINC; units often UCUM.
+-------------------------------------------------------------------------------
 ```
-
-
-# 查詢出來的 FHIR Bundle JSON
-
-底下為當完成了 DiagnosticReport + Observation 的 Transaction 之後，從 FHIR 伺服器查詢出來的 Bundle JSON，這個 Bundle 是在執行 [DeletePatientAndRelatedResourcesAsync] 方法之前，透過 FhirClient 的 SearchAsync 方法，以 subject=Patient/test-patient-001 的條件來查詢 Observation 資源時所得到的結果。這個 Bundle 內包含了剛剛建立的 Patient 資源以及相關的 Observation 資源。
-
-```json
-{
-  "resourceType": "Bundle",
-  "id": "64c57cc5-d0cd-4795-9838-827b8c048e93",
-  "meta": {
-    "lastUpdated": "2026-02-11T10:04:46.518+08:00"
-  },
-  "type": "searchset",
-  "total": 3,
-  "link": [ {
-    "relation": "self",
-    "url": "http://10.1.1.113:8080/fhir/Patient/test-patient-001/$everything?_format=json"
-  } ],
-  "entry": [ {
-    "fullUrl": "http://10.1.1.113:8080/fhir/Patient/test-patient-001",
-    "resource": {
-      "resourceType": "Patient",
-      "id": "test-patient-001",
-      "meta": {
-        "versionId": "5",
-        "lastUpdated": "2026-02-11T09:59:15.485+08:00"
-      },
-      "active": true,
-      "name": [ {
-        "use": "official",
-        "family": "測試",
-        "given": [ "病患", "範例" ]
-      } ],
-      "telecom": [ {
-        "system": "phone",
-        "value": "0912-345-678",
-        "use": "mobile"
-      } ],
-      "gender": "male",
-      "birthDate": "1980-01-01"
-    },
-    "search": {
-      "mode": "match"
-    }
-  }, {
-    "fullUrl": "http://10.1.1.113:8080/fhir/Observation/132756",
-    "resource": {
-      "resourceType": "Observation",
-      "id": "132756",
-      "meta": {
-        "versionId": "1",
-        "lastUpdated": "2026-02-11T09:59:15.663+08:00"
-      },
-      "status": "final",
-      "category": [ {
-        "coding": [ {
-          "system": "http://terminology.hl7.org/CodeSystem/observation-category",
-          "code": "imaging",
-          "display": "Imaging"
-        } ]
-      } ],
-      "code": {
-        "coding": [ {
-          "system": "https://example.org/fhir/CodeSystem/body-composition",
-          "code": "body-composition-summary",
-          "display": "Body composition AI summary"
-        } ]
-      },
-      "subject": {
-        "reference": "Patient/test-patient-001"
-      },
-      "effectiveDateTime": "2026-02-11T09:59:15.5716076+08:00",
-      "component": [ {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "SMI",
-            "display": "骨骼肌指標 (SMI)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 29.42,
-          "unit": "cm2/m2",
-          "system": "http://unitsofmeasure.org",
-          "code": "cm2/m2"
-        }
-      }, {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "SMD",
-            "display": "骨骼肌密度 (SMD)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 39.50,
-          "unit": "HU"
-        }
-      }, {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "IMAT",
-            "display": "肌間/肌內脂肪組織 (IMAT)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 11.69,
-          "unit": "cm2",
-          "system": "http://unitsofmeasure.org",
-          "code": "cm2"
-        }
-      }, {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "LAMA",
-            "display": "低密度肌肉區域 (LAMA)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 20.93,
-          "unit": "cm2",
-          "system": "http://unitsofmeasure.org",
-          "code": "cm2"
-        }
-      }, {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "NAMA",
-            "display": "正常密度肌肉區域 (NAMA)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 69.16,
-          "unit": "cm2",
-          "system": "http://unitsofmeasure.org",
-          "code": "cm2"
-        }
-      }, {
-        "code": {
-          "coding": [ {
-            "system": "https://example.org/fhir/CodeSystem/body-composition",
-            "code": "MYOSTEATOSIS",
-            "display": "肌肉脂肪變性 (Myosteatosis)"
-          } ]
-        },
-        "valueQuantity": {
-          "value": 32.62,
-          "unit": "cm2",
-          "system": "http://unitsofmeasure.org",
-          "code": "cm2"
-        }
-      } ]
-    },
-    "search": {
-      "mode": "match"
-    }
-  }, {
-    "fullUrl": "http://10.1.1.113:8080/fhir/DiagnosticReport/132757",
-    "resource": {
-      "resourceType": "DiagnosticReport",
-      "id": "132757",
-      "meta": {
-        "versionId": "1",
-        "lastUpdated": "2026-02-11T09:59:15.663+08:00"
-      },
-      "status": "final",
-      "category": [ {
-        "coding": [ {
-          "system": "http://terminology.hl7.org/CodeSystem/v2-0074",
-          "code": "RAD",
-          "display": "Radiology"
-        } ]
-      } ],
-      "code": {
-        "coding": [ {
-          "system": "https://example.org/fhir/CodeSystem/body-composition",
-          "code": "bodycomp-ai-report",
-          "display": "Body composition AI report"
-        } ]
-      },
-      "subject": {
-        "reference": "Patient/test-patient-001"
-      },
-      "effectiveDateTime": "2026-02-11T09:59:15.5716076+08:00",
-      "result": [ {
-        "reference": "Observation/132756"
-      } ],
-      "presentedForm": [ {
-        "contentType": "image/png",
-        "url": "http://localhost/result/2311",
-        "title": "Segmentation overlay"
-      } ]
-    },
-    "search": {
-      "mode": "match"
-    }
-  } ]
-}
-```
-
-
-
