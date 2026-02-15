@@ -64,16 +64,6 @@ Azure Blob Storage 是 Microsoft Azure 雲端平台提供的物件儲存服務�
 ## 撰寫程式碼
 * 打開 Program.cs 檔案，並將其內容替換為以下程式碼：
 
-在這個 Console 專案進入點方法中，首先宣告了五個字串，分別為 [connectionString] 其目的在為了儲存 Azure Blob Storage 的連線字串，這個連線字串會從環境變數中讀取，這樣就不需要把敏感資訊直接寫在程式碼裡面了。接著宣告了 [containerName] 這個字串變數，代表要上傳到 Azure Blob Storage 的哪一個 container。然後宣告了 [currentDirectory] 這個字串變數，透過 `Directory.GetCurrentDirectory()` 方法來取得當前的工作目錄路徑。接著宣告了 [localFilePath] 這個字串變數，將當前目錄與要上傳的檔案名稱結合成為完整的檔案路徑。最後宣告了 [blobName] 這個字串變數，從 localFilePath 中提取出檔案名稱作為 blob 的名稱。
-
-接著，程式碼中建立了一個 [BlobServiceClient] 的實例，這個實例是用來與 Azure Blob Storage 進行互動的主要物件，這裡是透過這個 [BlobServiceClient]建構式與傳入 Azure Blog Storage 連線字串來建立此物件，接著使用了 [GetBlobContainerClient] 方法來取得一個 BlobContainerClient 的實例，這個實例代表了要操作的 container [containerClient]。然後呼叫了 [CreateIfNotExistsAsync] 方法，如果這個 container 不存在，則會自動建立一個新的 container。接著再透過 BlobContainerClient 來取得一個 BlobClient 的實例，這個實例代表了要操作的 blob。
-
-之後，使用 [containerClient.GetBlobClient(blobName)] 來取得一個 BlobClient 的實例，這個實例代表了要操作的 blob。接著使用 [File.OpenRead(localFilePath)] 方法來開啟要上傳的檔案，並將它包裝成為一個 FileStream 的物件。然後建立了一個 [BlobHttpHeaders] 的物件，並設定 ContentType 為 "audio/mpeg"，這樣在瀏覽器或其他客戶端讀取這個 blob 時，就能正確地識別它的內容類型。最後，呼叫了 [UploadAsync] 方法來將檔案上傳到 Azure Blob Storage 中，並傳入 BlobUploadOptions 來設定 HTTP 標頭。一旦上傳完成，就會關閉檔案流並印出上傳完成的訊息。
-
-對於 [blobItemClient] 這個 BlobClient 實例，其主要的用途在於操作特定的 blob，例如取得其 URL 或生成 SAS URI。我們可以直接從它的 Uri 屬性來取得這個 blob 的 URL，然後印出來。接著，使用 [GenerateSasUri] 方法來生成一個帶有讀取權限的 SAS URI。
-
-對於 SAS 這樣的物件，其目的在於提供一個 URI 可以讓其他人或服務在指定的時間內存取這個 blob，而不需要提供 Azure Blob Storage 的帳戶金鑰。最後，將生成的 SAS URI 印出來。
-
 ```csharp
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs;
@@ -109,4 +99,14 @@ internal class Program
 }
 ```
 
+
+在這個 Console 專案進入點方法中，首先宣告了五個字串，分別為 [connectionString] 其目的在為了儲存 Azure Blob Storage 的連線字串，這個連線字串會從環境變數中讀取，這樣就不需要把敏感資訊直接寫在程式碼裡面了。接著宣告了 [containerName] 這個字串變數，代表要上傳到 Azure Blob Storage 的哪一個 container。然後宣告了 [currentDirectory] 這個字串變數，透過 `Directory.GetCurrentDirectory()` 方法來取得當前的工作目錄路徑。接著宣告了 [localFilePath] 這個字串變數，將當前目錄與要上傳的檔案名稱結合成為完整的檔案路徑。最後宣告了 [blobName] 這個字串變數，從 localFilePath 中提取出檔案名稱作為 blob 的名稱。
+
+接著，程式碼中建立了一個 [BlobServiceClient] 的實例，這個實例是用來與 Azure Blob Storage 進行互動的主要物件，這裡是透過這個 [BlobServiceClient]建構式與傳入 Azure Blog Storage 連線字串來建立此物件，接著使用了 [GetBlobContainerClient] 方法來取得一個 BlobContainerClient 的實例，這個實例代表了要操作的 container [containerClient]。然後呼叫了 [CreateIfNotExistsAsync] 方法，如果這個 container 不存在，則會自動建立一個新的 container。接著再透過 BlobContainerClient 來取得一個 BlobClient 的實例，這個實例代表了要操作的 blob。
+
+之後，使用 [containerClient.GetBlobClient(blobName)] 來取得一個 BlobClient 的實例，這個實例代表了要操作的 blob。接著使用 [File.OpenRead(localFilePath)] 方法來開啟要上傳的檔案，並將它包裝成為一個 FileStream 的物件。然後建立了一個 [BlobHttpHeaders] 的物件，並設定 ContentType 為 "audio/mpeg"，這樣在瀏覽器或其他客戶端讀取這個 blob 時，就能正確地識別它的內容類型。最後，呼叫了 [UploadAsync] 方法來將檔案上傳到 Azure Blob Storage 中，並傳入 BlobUploadOptions 來設定 HTTP 標頭。一旦上傳完成，就會關閉檔案流並印出上傳完成的訊息。
+
+對於 [blobItemClient] 這個 BlobClient 實例，其主要的用途在於操作特定的 blob，例如取得其 URL 或生成 SAS URI。我們可以直接從它的 Uri 屬性來取得這個 blob 的 URL，然後印出來。接著，使用 [GenerateSasUri] 方法來生成一個帶有讀取權限的 SAS URI。
+
+對於 SAS 這樣的物件，其目的在於提供一個 URI 可以讓其他人或服務在指定的時間內存取這個 blob，而不需要提供 Azure Blob Storage 的帳戶金鑰。最後，將生成的 SAS URI 印出來。
 
