@@ -1,10 +1,5 @@
-# Blazor 跳轉 1 : 動態路由參數，傳遞與接收路由參數
+# Blazor 跳轉 2 : 導航切換頁面時候，透過查詢字串，傳遞與接收查詢參數
 
-使用 Blazor 開發框架進行開發 Web 專案的時候，經常會需要在不同的頁面之間進行跳轉，並且在跳轉的過程中，將一些參數傳遞給目標頁面，以便在目標頁面中根據這些參數來顯示相應的內容或進行相應的操作。這裡將會透過兩篇文章說明如何在不同的頁面間來傳遞這些參數，並且在目標頁面中來接收這些參數。
-
-首先將會使用路由 Routing 的方式來進行傳遞參數，這裡將會在 URL 中來傳遞參數，並且在目標頁面中來接收這些參數。接著，在下一篇文章中，將會說明如何使用 Query String 的方式來傳遞參數，這裡將會在 URL 的查詢字串中來傳遞參數，並且在目標頁面中來接收這些參數。
-
-透過底下的開發實作說明，將會說明如何在 Blazor 中來實現這些功能，並且在實際的開發過程中，將會提供一些程式碼範例來說明這些功能的實現方式。
 
 # 建立 Blazor 專案
 * 開啟 Visual Studio 2026
@@ -12,7 +7,7 @@
 * 在 [建立新專案] 視窗中，在右方清單內，找到並選擇「Blazor Web 應用程式」 項目
 * 然後點擊右下方「下一步」按鈕
 * 此時將會看到 [設定新的專案] 對話窗
-* 在該對話窗的 [專案名稱] 欄位中，輸入專案名稱，例如 "csBlazorRoutingParameter"
+* 在該對話窗的 [專案名稱] 欄位中，輸入專案名稱，例如 "csBlazorQueryString"
 * 然後點擊右下方「下一步」按鈕
 * 接著會看到 [其他資訊] 對話窗
 * 在這個對話窗內，確認使用底下的選項
@@ -44,7 +39,7 @@
 * 接著，打開 Product.cs 類別檔案，並將以下程式碼複製貼上到該檔案中：
 
 ```csharp
-namespace csBlazorRoutingParameter.Components.Pages;
+namespace csBlazorQueryString.Components.Pages;
 
 public class Product
 {
@@ -73,9 +68,9 @@ public class Product
 * 接著，打開 ProductService.cs 類別檔案，並將以下程式碼複製貼上到該檔案中：
 
 ```csharp
-using csBlazorRoutingParameter.Components.Pages;
+using csBlazorQueryString.Components.Pages;
 
-namespace csBlazorRoutingParameter.Services;
+namespace csBlazorQueryString.Services;
 
 public class ProductService
 {
@@ -83,18 +78,18 @@ public class ProductService
     public ProductService()
     {
         Products = new List<Product>
-        {
-            new Product { Id = 1, Name = "智慧型手機", Price = 15999, StockQuantity = 120, LaunchDate = new DateTime(2025, 1, 15) },
-            new Product { Id = 2, Name = "筆記型電腦", Price = 32000, StockQuantity = 45, LaunchDate = new DateTime(2024, 11, 20) },
-            new Product { Id = 3, Name = "無線耳機", Price = 3500, StockQuantity = 200, LaunchDate = new DateTime(2025, 3, 10) },
-            new Product { Id = 4, Name = "智慧手錶", Price = 5999, StockQuantity = 75, LaunchDate = new DateTime(2025, 2, 5) },
-            new Product { Id = 5, Name = "平板電腦", Price = 12500, StockQuantity = 60, LaunchDate = new DateTime(2024, 12, 1) },
-            new Product { Id = 6, Name = "藍牙喇叭", Price = 2800, StockQuantity = 150, LaunchDate = new DateTime(2025, 4, 25) },
-            new Product { Id = 7, Name = "遊戲主機", Price = 12000, StockQuantity = 30, LaunchDate = new DateTime(2024, 10, 15) },
-            new Product { Id = 8, Name = "無線滑鼠", Price = 1200, StockQuantity = 180, LaunchDate = new DateTime(2025, 5, 10) },
-            new Product { Id = 9, Name = "機械鍵盤", Price = 3200, StockQuantity = 90, LaunchDate = new DateTime(2025, 3, 15) },
-            new Product { Id = 10, Name = "電競顯示器", Price = 8500, StockQuantity = 40, LaunchDate = new DateTime(2024, 9, 5) }
-        };
+    {
+        new Product { Id = 1, Name = "智慧型手機", Price = 15999, StockQuantity = 120, LaunchDate = new DateTime(2025, 1, 15) },
+        new Product { Id = 2, Name = "筆記型電腦", Price = 32000, StockQuantity = 45, LaunchDate = new DateTime(2024, 11, 20) },
+        new Product { Id = 3, Name = "無線耳機", Price = 3500, StockQuantity = 200, LaunchDate = new DateTime(2025, 3, 10) },
+        new Product { Id = 4, Name = "智慧手錶", Price = 5999, StockQuantity = 75, LaunchDate = new DateTime(2025, 2, 5) },
+        new Product { Id = 5, Name = "平板電腦", Price = 12500, StockQuantity = 60, LaunchDate = new DateTime(2024, 12, 1) },
+        new Product { Id = 6, Name = "藍牙喇叭", Price = 2800, StockQuantity = 150, LaunchDate = new DateTime(2025, 4, 25) },
+        new Product { Id = 7, Name = "遊戲主機", Price = 12000, StockQuantity = 30, LaunchDate = new DateTime(2024, 10, 15) },
+        new Product { Id = 8, Name = "無線滑鼠", Price = 1200, StockQuantity = 180, LaunchDate = new DateTime(2025, 5, 10) },
+        new Product { Id = 9, Name = "機械鍵盤", Price = 3200, StockQuantity = 90, LaunchDate = new DateTime(2025, 3, 15) },
+        new Product { Id = 10, Name = "電競顯示器", Price = 8500, StockQuantity = 40, LaunchDate = new DateTime(2024, 9, 5) }
+    };
     }
     public List<Product> GetProducts()
     {
@@ -136,7 +131,8 @@ builder.Services.AddSingleton<Services.ProductService>();
 
 @inject NavigationManager NavigationManager
 
-@inject csBlazorRoutingParameter.Services.ProductService ProductService
+@inject csBlazorQueryString.Services.ProductService ProductService
+@inject ILogger<ProductListPage> Logger
 
 <h3>產品清單</h3>
 
@@ -154,7 +150,7 @@ builder.Services.AddSingleton<Services.ProductService>();
         @foreach (var product in products)
         {
             <tr class="cursor-pointer"
-            @onclick="()=>OnProductSelected(product)">
+                @onclick="() => OnProductSelected(product)">
                 <td>@product.Id</td>
                 <td>@product.Name</td>
                 <td>@product.Price.ToString("C")</td>
@@ -183,7 +179,14 @@ builder.Services.AddSingleton<Services.ProductService>();
     void OnProductSelected(Product product)
     {
         // 導航到產品詳細頁面，並傳遞產品 ID
-        NavigationManager.NavigateTo($"/product/{product.Id}/345");
+        var queryParams = new Dictionary<string, object?>
+        {
+            ["id"] = product.Id
+        };
+
+        var uri = NavigationManager.GetUriWithQueryParameters("product", queryParams);
+        Logger.LogInformation("Navigating Uri: {uri}", uri);
+        NavigationManager.NavigateTo(uri);
     }
 }
 ```
@@ -207,12 +210,12 @@ builder.Services.AddSingleton<Services.ProductService>();
 * 接著，打開 ProductDetail.razor 元件，並將以下程式碼複製貼上到該元件中：
 
 ```razor
-@page "/product/{id:int}"
+@page "/product"
 @using Microsoft.AspNetCore.Components
 @using Microsoft.AspNetCore.Components.Routing
 @inject NavigationManager NavigationManager
 
-@inject csBlazorRoutingParameter.Services.ProductService ProductService
+@inject csBlazorQueryString.Services.ProductService ProductService
 
 <div class="container mt-4">
     @if (product != null)
@@ -243,7 +246,9 @@ builder.Services.AddSingleton<Services.ProductService>();
 </div>
 
 @code {
-    [Parameter]
+    // [SupplyParameterFromQuery(Name = "id")]
+    // public int Id { get; set; }
+    [SupplyParameterFromQuery]
     public int Id { get; set; }
 
     private Product? product;
@@ -274,9 +279,9 @@ builder.Services.AddSingleton<Services.ProductService>();
 首先先來看這個專案的執行結果：
 
 * 按下 F5 鍵或點擊「開始」按鈕來執行程式
-* 在瀏覽器中，輸入 URL， https://localhost:7254/ProductList
+* 在瀏覽器中，輸入 URL， https://localhost:7124/ProductList
 * 現在將會看到底下畫面
 ![](../Images/cs2025-896.png)
 * 點選任何一個產品紀錄
-* 此時將會切轉到底下畫面，並且在畫面上顯示出該產品的 ID，此時的網址列 URL 將會轉變成為 https://localhost:7254/product/2
+* 此時將會切轉到底下畫面，並且在畫面上顯示出該產品的 ID，此時的網址列 URL 將會轉變成為 https://localhost:7124/product?id=2
 ![](../Images/cs2025-895.png)
