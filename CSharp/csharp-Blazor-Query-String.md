@@ -1,7 +1,11 @@
 # Blazor 跳轉 2 : 導航切換頁面時候，透過查詢字串，傳遞與接收查詢參數
 
+在上一篇文章中，[Blazor 跳轉 1 : 動態路由參數，傳遞與接收路由參數
+](https://csharpkh.blogspot.com/2026/02/csharp-Blazor-Routing-Parameter.html)，當使用者在產品清單頁面點選某一筆產品紀錄時，將會導航到產品詳細頁面，並且在 URL 中傳遞該產品的 ID 參數，這裡使用的方式為 $"/product/{product.Id}"，這樣在 URL 中就會包含該產品的 ID 參數，這樣的方式將會是採用了路由參數的方式，這樣在產品詳細頁面中就可以接收這個參數並且根據這個參數來顯示相應的產品資訊。
 
-# 建立 Blazor 專案
+在這篇文章中，將會說明另一種在 Blazor 中來傳遞參數的方式，這裡將會使用查詢字串 Query String 的方式來傳遞參數，這樣在 URL 中就會包含一個查詢字串，例如 https://localhost:7124/product?id=2，這樣在產品詳細頁面中就可以接收這個查詢字串中的 id 參數，並且根據這個參數來顯示相應的產品資訊。
+
+## 建立 Blazor 專案
 * 開啟 Visual Studio 2026
 * 選擇「建立新專案」
 * 在 [建立新專案] 視窗中，在右方清單內，找到並選擇「Blazor Web 應用程式」 項目
@@ -193,11 +197,11 @@ builder.Services.AddSingleton<Services.ProductService>();
 
 在這個 [ProductListPage] 頁面中，使用了 @page 指令來定義這個頁面的路由為 "/ProductList"，這樣當使用者訪問這個 URL 時，就會顯示這個頁面。在這個頁面中，使用了 @inject 指令來注入了 NavigationManager 服務以及 ProductService 服務，這樣就可以在這個頁面中來使用這些服務。 接著，在頁面中使用了一個 HTML 的 table 元素來顯示產品的清單，並且在每一筆產品紀錄上，提供了一個 @onclick 事件處理器，當使用者點選該產品紀錄時，將會呼叫 OnProductSelected 方法，並且在該方法中使用 NavigationManager 服務來導航到產品詳細頁面，並且在 URL 中傳遞該產品的 ID 參數。
 
-在 @code 的 C# 程式碼區塊中，定義了一個 products 的私有欄位，用來儲存從 ProductService 服務中取得的產品清單。在 OnInitialized 方法中，從 ProductService 服務中取得產品清單並賦值給 products 欄位。接著，在 OnProductSelected 方法中，使用 NavigationManager 服務來導航到產品詳細頁面，並且在 URL 中傳遞該產品的 ID 參數，這裡使用的方式為 $"/product/{product.Id}/345"，這樣在 URL 中就會包含該產品的 ID 參數，這樣在產品詳細頁面中就可以接收這個參數並且根據這個參數來顯示相應的產品資訊。
+在 @code 的 C# 程式碼區塊中，定義了一個 products 的私有欄位，用來儲存從 ProductService 服務中取得的產品清單。在 OnInitialized 方法中，從 ProductService 服務中取得產品清單並賦值給 products 欄位。接著，在 OnProductSelected 方法中，使用 NavigationManager 服務來導航到產品詳細頁面，並且在 URL 中傳遞該產品的 ID 參數，這裡使用的方式為先建立一個資料字典 Dictionary 物件， [queryParams]，然後將產品 ID 參數加入到這個字典中，對於這個 `["id"]` 內容，將會表示為查詢字串中的 id 參數，接著透過 [NavigationManager.GetUriWithQueryParameters] 方法來建立一個包含查詢字串的 URL，這個 URL 將會儲存在 [uri] 變數中，最後使用 NavigationManager.NavigateTo 方法來導航到該 URL。
 
 ## 建立 ProductDetail 頁面
 
-接下來，將會建立一個 [ProductDetail] 頁面，這個頁面將會用來顯示產品的詳細資訊。在這個頁面中，將會使用 @page 指令來定義這個頁面的路由，路由定義為 "/product/{id:int}"，並且在路由中定義一個動態參數 {id}，這個參數將會用來接收從產品清單頁面傳遞過來的產品 ID 參數。
+接下來，將會建立一個 [ProductDetail] 頁面，這個頁面將會用來顯示產品的詳細資訊。在這個頁面中，將會使用 @page 指令來定義這個頁面的路由，路由定義為 "/product"，這樣在 URL 中就不會包含路由參數，而是透過查詢字串來傳遞參數，例如 https://localhost:7124/product?id=2，這樣在產品詳細頁面中就可以接收這個查詢字串中的 id 參數，並且根據這個參數來顯示相應的產品資訊。
 
 接著，在這個頁面中，將會使用 ProductService 服務來根據接收到的產品 ID 參數來查詢對應的產品資訊，並且在頁面上顯示出該產品的詳細資訊。
 
@@ -246,8 +250,6 @@ builder.Services.AddSingleton<Services.ProductService>();
 </div>
 
 @code {
-    // [SupplyParameterFromQuery(Name = "id")]
-    // public int Id { get; set; }
     [SupplyParameterFromQuery]
     public int Id { get; set; }
 
@@ -270,9 +272,7 @@ builder.Services.AddSingleton<Services.ProductService>();
 
 在這個頁面的 HTML 部分，透過了資料綁定機制來顯示產品的詳細資訊，並且提供了一個按鈕，當使用者點選該按鈕時，將會導航回產品清單頁面。
 
-在程式碼內，使用了 [Parameter] 屬性來定義了一個 Id 的參數，這個參數用來接收從 URL 中傳遞過來的產品 ID 參數。在 OnParametersSet 方法中，從 ProductService 服務中取得所有的產品清單，並且根據接收到的 Id 參數來查詢對應的產品資訊，並且將該產品資訊賦值給 product 欄位，這樣在 HTML 部分就可以顯示出該產品的詳細資訊。
-
-關於 Blazor 頁面生命週期內，將會有這些觸發事件：[OnInitialized]、[OnParametersSet]、[OnAfterRender] 等等，這些事件將會在頁面生命週期的不同階段被觸發，開發者可以根據實際的需求來選擇在這些事件中來執行相應的程式碼邏輯。一般來說，在頁面要顯示出來的時候，這些事件的觸發順序將會為 OnInitialized -> OnParametersSet -> OnAfterRender，當頁面上的參數變更時，將會觸發 OnParametersSet 事件，這樣就可以在該事件中來根據新的參數值來更新頁面上的內容。
+在程式碼內，使用了 [SupplyParameterFromQuery] 屬性來定義了一個 Id 的參數，這個參數用來接收從 URL 中傳遞過來的產品 ID 參數。在 OnParametersSet 方法中，從 ProductService 服務中取得所有的產品清單，並且根據接收到的 Id 參數來查詢對應的產品資訊，並且將該產品資訊賦值給 product 欄位，這樣在 HTML 部分就可以顯示出該產品的詳細資訊。
 
 # 執行程式
 

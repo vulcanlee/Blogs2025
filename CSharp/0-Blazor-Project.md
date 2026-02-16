@@ -2,7 +2,7 @@
 
 
 
-# 建立 Blazor 專案
+## 建立 Blazor 專案
 * 開啟 Visual Studio 2026
 * 選擇「建立新專案」
 * 在 [建立新專案] 視窗中，在右方清單內，找到並選擇「Blazor Web 應用程式」 項目
