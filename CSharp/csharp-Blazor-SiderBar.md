@@ -1,6 +1,6 @@
 # Blazor 使用 Ant Design Blazor 側邊欄範例
 
-
+在現代的 Web 網站設計中，對於側邊欄功能表 SiderBar 的需求是非常常見的，這種功能表通常用於提供網站的主要導航選項，讓使用者能夠快速地訪問網站的不同部分。在這個範例中，我們將使用 Blazor 和 Ant Design Blazor 來實現一個具有側邊欄功能表的網站。
 
 ## 建立 Blazor 專案
 * 開啟 Visual Studio 2026
@@ -55,6 +55,23 @@
 <script src="_content/AntDesign/js/ant-design-blazor.js"></script> 
 <script antblazor-js></script>
 ```
+
+為了要能夠在這個 Blazor 專案內使用 [AntDesign] 的元件，這裡需要在這個專案內加入參考 [AntDesign] 的 CSS 和 JavaScript 檔案。這樣才能確保在使用 [AntDesign] 的元件時，能夠正確地載入相關的樣式和功能。
+
+所以，在 [App.razor] 檔案內，這是 [Blazor] 專案的進入點，在這裡首先需要找到 [<head>] 標籤，然後在 [</head>] 標籤前加入一行程式碼，這行代表是用來引入 [AntDesign] 的 CSS 檔案 `<link href="_content/AntDesign/css/ant-design-blazor.css" rel="stylesheet">` 。在這個專案內，使用 [AntDesign] 的元件時，這些元件的樣式都是定義在這個 CSS 檔案中的，所以必須要引入這個 CSS 檔案才能正確地顯示 [AntDesign] 元件的樣式。
+
+接著，需要加入 [AntDesign] 需要用到的 JavaScript 檔案，在 [</body>] 標籤前加入兩行程式碼，這兩行程式碼是用來引入 [AntDesign] 的 JavaScript 檔案，以及啟用 [AntDesign] 的 JavaScript 功能。在這個專案內，可以使用的 [AntDesign] 的 JavaScript 功能，包含了像是彈出式提示、模態框、下拉選單等等，這些功能都是透過 JavaScript 來實現的，所以必須要引入相關的 JavaScript 檔案才能使用這些功能。
+
+## 註冊 AntDesign 的服務
+* 在專案根目錄下，找到 [Program.cs] 檔案，並打開它
+* 在 [Program.cs] 檔案中，找到 `var app = builder.Build();` 這行程式碼
+* 在這行程式碼的上方，加入以下程式碼：
+
+```csharp
+builder.Services.AddAntDesign();
+```
+
+這行程式碼的作用是將 [AntDesign] 的服務註冊到這個 Blazor 專案的依賴注入容器中。這樣在專案的其他部分，就可以透過依賴注入的方式來使用 [AntDesign] 的功能和元件了。
 
 ## 建立新的版面配置頁面
 
@@ -143,6 +160,18 @@
 }
 ```
 
+在這個 [SilderBarLayout.razor] 檔案，最上方有宣告 `@inherits LayoutComponentBase`，這表示這個 Razor 組件繼承自 Blazor 的 `LayoutComponentBase` 類別，這是 Blazor 中用來定義版面配置的基底類別。透過繼承 `LayoutComponentBase`，這個組件就可以作為其他頁面的版面配置，讓其他頁面可以使用這個組件定義的結構和樣式。也就是，這個元件可以用於其他頁面，作為這些頁面的版面配置，讓這些頁面能夠共享這個組件定義的結構和樣式。
+
+在 `<Layout>` 標籤之後，使用了 [AntDesign] 的 `<Sider>` 元件來定義側邊欄元件，這個側邊欄可以透過 `@bind-Collapsed` 屬性來綁定一個布林變數 `collapsed`，這個變數用來控制側邊欄的收合狀態。當 `collapsed` 為 `true` 時，側邊欄會收合起來；當 `collapsed` 為 `false` 時，側邊欄會展開。
+
+在 `<Sider>` 元件內，定義了一個 `<Menu>` 元件，這個 `<Menu>` 元件用來顯示側邊欄的功能選單，這裡定義了三個 `<MenuItem>` 元件，分別代表三個功能選項，每個選項都有一個圖示和一個文字標籤。
+
+在這個 `<Layout>` 元件內，還定義了一個 `<Layout>` 元件，用來包裹主要內容區域，包括標頭（Header）和內容（Content）。在標頭（Header）中，根據 `collapsed` 變數的值，顯示不同的圖示按鈕，當側邊欄收合時，顯示展開圖示；當側邊欄展開時，顯示收合圖示。這些圖示按鈕都有一個 `OnClick` 事件處理器 `toggle`，用來切換側邊欄的收合狀態。 
+
+而 `<Content>` 元件則用來顯示主要內容區域，這裡使用了 `@Body` 來表示這個區域會顯示其他頁面的內容，這樣當其他頁面使用這個版面配置時，這些頁面的內容就會顯示在這個 `<Content>` 區域中。 最後，在 `<style>` 標籤內定義了一些 CSS 樣式，用來調整側邊欄和主要內容區域的外觀和佈局。
+
+從這個元件內，可以看到這樣的元件使用結構圖， [Layout] > [Sider] > [Menu] > [MenuItem]，以及 [Layout] > [Layout] > [Header] 和 [Layout] > [Content] 的結構，這些結構定義了整個頁面的佈局和功能。
+
 ## 修正 天氣預報 頁面
 
 * 在專案根目錄下，找到 [Components] > [Pages] 目錄下
@@ -215,6 +244,8 @@ else
     }
 }
 ```
+
+在這個 [Weather.razor] 頁面中，首先在 `@page` 指令中使用了 `@layout SilderBarLayout`，這表示這個頁面將使用剛才建立的 [SilderBarLayout] 作為它的版面配置。這樣當這個頁面被訪問時，它就會顯示在 [SilderBarLayout] 定義的結構和樣式中。
 
 ## 執行程式
 
