@@ -1,4 +1,4 @@
-# React API 03 : 呼叫一個 Get 方法 API，取得路由內容並將結果渲染到網頁上
+# React API 04 : 呼叫一個 Get 方法 API，傳送與取得 Header 的數值
 
 在 React 系列的第一篇文章中 [React API 01 : 前端使用 React，後端使用 ASP.NET Core 的測試標準專案](https://csharpkh.blogspot.com/2026/02/csharp-React-Web-Api.html) & [React API 02 : 呼叫一個 Get 方法 API，取得查詢字串內容並將結果渲染到網頁上](https://csharpkh.blogspot.com/2026/02/csharp-React-Get-Query-String.html) ，這裡透過建立一個 ASP.NET Core Web API 專案，來示範如何建立一個 GET 方法的 API 端點，在第一篇文章中，單純使用 HTTP GET 方法來呼叫 API，第二篇文章，雖然也是使用 HTTP GET 方法，但是透過查詢字串的方式，接收來自於前端 App 的參數，透過這些參數，進行相關客製處理，另外建立一個 React 專案，並且在前端的 React 應用程式中呼叫這個 API 端點，將查詢字串參數傳送給後端，並且將後端回傳的資料渲染到網頁上。
 
