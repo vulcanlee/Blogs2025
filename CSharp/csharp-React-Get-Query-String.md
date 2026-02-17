@@ -254,7 +254,7 @@ export default App
 
 在這個 [App.tsx] 的程式碼中，定義了一個 `WeatherForecast` 的 TypeScript 介面，來對應後端 API 回傳的資料結構。接著，使用 React 的 `useState` Hook 來管理天氣預報資料、載入狀態和錯誤訊息。
 
-這裡設定 [apiBase] 變數為後端 API 的基本 URL，這樣在呼叫 API 的時候就可以使用這個變數來組合完整的 API 端點 URL。
+這裡設定 [apiBase] 變數為後端 API 的基本 URL，這樣在呼叫 API 的時候就可以使用這個變數來組合完整的 API 端點 URL。另外，使用了 await fetch(`${apiBase}/weatherforecast/GetWeatherByLocationAndDate?${query}`) 的方式來呼叫後端的 API 端點，並且將地點與日期作為查詢字串參數傳送給後端。
 
 另外，定義了一個 `fetchWeatherForecast` 的非同步函數，來呼叫後端的 API 端點，並將回傳的資料存到 `forecasts` 的狀態中。如果在呼叫 API 的過程中發生錯誤，會將錯誤訊息存到 `error` 的狀態中。在 JSX 的部分，建立了一個按鈕，當使用者點擊時會呼叫 `fetchWeatherForecast` 函數來獲取天氣預報資料。當資料成功獲取後，會將資料以表格的形式顯示在畫面上。如果在獲取資料的過程中發生錯誤，我們會在畫面上顯示錯誤訊息。
 
