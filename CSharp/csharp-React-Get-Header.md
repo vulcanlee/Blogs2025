@@ -1,8 +1,8 @@
 # React API 04 : 呼叫一個 Get 方法 API，傳送與取得 Header 的數值
 
-在 React 系列的第一篇文章中 [React API 01 : 前端使用 React，後端使用 ASP.NET Core 的測試標準專案](https://csharpkh.blogspot.com/2026/02/csharp-React-Web-Api.html) & [React API 02 : 呼叫一個 Get 方法 API，取得查詢字串內容並將結果渲染到網頁上](https://csharpkh.blogspot.com/2026/02/csharp-React-Get-Query-String.html) ，這裡透過建立一個 ASP.NET Core Web API 專案，來示範如何建立一個 GET 方法的 API 端點，在第一篇文章中，單純使用 HTTP GET 方法來呼叫 API，第二篇文章，雖然也是使用 HTTP GET 方法，但是透過查詢字串的方式，接收來自於前端 App 的參數，透過這些參數，進行相關客製處理，另外建立一個 React 專案，並且在前端的 React 應用程式中呼叫這個 API 端點，將查詢字串參數傳送給後端，並且將後端回傳的資料渲染到網頁上。
+在 React 系列的文章中 [React API 01 : 前端使用 React，後端使用 ASP.NET Core 的測試標準專案](https://csharpkh.blogspot.com/2026/02/csharp-React-Web-Api.html) & [React API 02 : 呼叫一個 Get 方法 API，取得查詢字串內容並將結果渲染到網頁上](https://csharpkh.blogspot.com/2026/02/csharp-React-Get-Query-String.html) & [React API 03 : 呼叫一個 Get 方法 API，取得路由內容並將結果渲染到網頁上](https://csharpkh.blogspot.com/2026/02/csharp-React-Get-Routing-Value.html) ，同樣是使用 HTTP GET 方法來設計出採用 ASP.NET Core 設計出來的 Web API，並且說明如何做出這樣的設計，接著，也說明如何設計 React 的前端應用程式，來呼叫這個 API 端點，並且將資料渲染到網頁上。透過這些說明，可以同時讓前端與後端的開發者知道如何使用路由參數來進行設計。
 
-現在，我們來看看第三篇文章的內容，這裡同樣是建立一個 ASP.NET Core Web API 專案，並且在其中定義一個 GET 方法的 API 端點，不過這次我們將不會使用查詢字串參數的方式來接收來自於前端 App 的參數，而是使用路由方式來傳遞同樣的參數，然後在前端的 React 應用程式中呼叫這個 API 端點，將路由參數傳送給後端，並且將後端回傳的資料渲染到網頁上。透過這樣的說明，可以同時讓前端與後端的開發者知道如何使用路由參數來進行設計。
+現在，我們來看看第四篇文章的內容，這裡同樣是建立一個 ASP.NET Core Web API 專案，並且在其中定義一個 GET 方法的 API 端點，不過這次我們將不會使用查詢字串參數或路由參數的方式來接收來自於前端 App 的參數，而是使用 HTTP Header 的方式來接收傳遞的參數，在經過處理之後，將所產生的天氣預報 JSON 資料，回傳給前端，不過，這裡的回傳的 JSON 物件，將會放到 HTTP Header 上，然後在前端的 React 應用程式中呼叫這個 API 端點，將 Header 參數傳送給後端，當後端 API 處理完成後， React 的前端應用程式會從 HTTP Header 上取得回傳的 JSON 物件，並且將它渲染到網頁上。透過這樣的說明，可以同時讓前端與後端的開發者知道如何使用 HTTP Header 來進行設計。
 
 接下來就來嘗試看看這樣的需求如何做到吧！
 
@@ -53,23 +53,29 @@ public class WeatherForecastController : ControllerBase
         _logger = logger;
     }
 
-    [HttpGet("GetWeatherByLocationAndDate/{location}/{date}")]
-    public ActionResult<IEnumerable<WeatherForecast>> 
-        GetWeatherByLocationAndDateRoute([FromRoute] string location, [FromRoute] DateOnly date)
+    [HttpGet("GetWeatherForecastWithHeaders", Name = "GetWeatherForecastWithHeaders")]
+    public string GetWeatherForecastWithHeaders(
+        [FromHeader(Name = "Location")] string location,
+        [FromHeader(Name = "StartDate")] DateOnly startDate)
     {
-        // 這裡可以根據地點與日期來產生不同的天氣預報
-        return Ok(Enumerable.Range(1, 5).Select(index => new WeatherForecast
+        _logger.LogInformation("Location: {Location}, StartDate: {StartDate}", location, startDate);
+        var forecasts = Enumerable.Range(1, 5).Select(index => new WeatherForecast
         {
-            Date = date.AddDays(index),
+            Date = startDate.AddDays(index),
             TemperatureC = Random.Shared.Next(-20, 55),
-            Summary = Summaries[Random.Shared.Next(Summaries.Length)],
-            Location = location
-        }).ToArray());
+            Summary = Summaries[Random.Shared.Next(Summaries.Length)]
+        })
+        .ToArray();
+
+        // 將天氣預報結果序列化為 JSON 字串，並且放到 Response Header 中
+        var forecastsJson = System.Text.Json.JsonSerializer.Serialize(forecasts);
+        Response.Headers.Add("X-Weather-Forecasts", forecastsJson);
+        return "OK";
     }
 }
 ```
 
-這裡定義了一個新的 API 端點 [GetWeatherByLocationAndDate]，這個端點使用了 `[HttpGet]` 的屬性來指定它是一個 GET 方法的 API，並且在路由中指定了 [GetWeatherByLocationAndDate] 的路徑。這個 API 端點接受兩個路由參數，分別是 [location] 與 [date]，並且使用 `[FromRoute]` 的屬性來告訴 ASP.NET Core 從路由中取得這些參數的值。
+這裡定義了一個新的 API 端點 [GetWeatherForecastWithHeaders]，這個端點使用了 `[HttpGet]` 的屬性來指定它是一個 GET 方法的 API，並且在路由中指定了 [GetWeatherForecastWithHeaders] 的路徑。這個 API 端點接受兩個 Header 參數，分別是 [Location] 與 [StartDate]，並且使用 `[FromHeader]` 的屬性來告訴 ASP.NET Core 從 Header 中取得這些參數的值。
 
 ## 建立 React 專案
 * 滑鼠右擊解決方案 [WebApiDemo]，選擇「加入」>「新增專案」
@@ -96,171 +102,158 @@ import reactLogo from './assets/react.svg'
 import viteLogo from '/vite.svg'
 import './App.css'
 
-// 定義 WeatherForecast 型別，對應後端的資料結構
 interface WeatherForecast {
-    date: string;
-    temperatureC: number;
-    temperatureF: number;
-    summary: string;
-    location: string;
+  date: string
+  temperatureC: number
+  summary: string
+  temperatureF?: number
 }
 
 function App() {
-    const [count, setCount] = useState(0)
-    const [forecasts, setForecasts] = useState<WeatherForecast[]>([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState('')
+  const [count, setCount] = useState(0)
 
-    // 使用者輸入地點與日期
-    const [location, setLocation] = useState('Kaohsiung')
-    const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]) // YYYY-MM-DD
+    const [location, setLocation] = useState<string>('Kaohsiung')
+    const [startDate, setStartDate] = useState<string>('2025-09-01') 
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [forecasts, setForecasts] = useState<WeatherForecast[]>([])
 
-    const apiBase = 'https://localhost:7074'
+  const apiBase = 'https://localhost:7074'
 
-    // 呼叫後端 GetWeatherByLocationAndDate API
-    const fetchWeatherByLocationAndDate = async () => {
-        setLoading(true)
-        setError('')
-        setForecasts([])
+  const fetchForecasts = async () => {
+    setLoading(true)
+    setError(null)
+    setForecasts([])
 
-        try {
-            if (!location.trim()) {
-                throw new Error('地點不可為空')
-            }
-            if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-                throw new Error('日期格式需為 YYYY-MM-DD')
-            }
+    try {
+      if (!location.trim()) {
+        throw new Error('請輸入地點')
+      }
+      if (!startDate) {
+        throw new Error('請選擇日期')
+      }
 
-            const query = new URLSearchParams({
-                location: location.trim(),
-                date: date
-            }).toString()
-
-            const response = await fetch(`${apiBase}/weatherforecast/GetWeatherByLocationAndDate/${location.trim()}/${date}`)
-
-            if (!response.ok) {
-                throw new Error(`API 請求失敗: ${response.status}`)
-            }
-
-            const data = await response.json() as WeatherForecast[]
-            setForecasts(data)
-        } catch (err) {
-            setError(err instanceof Error ? err.message : '取得資料時發生錯誤')
-            console.error('GetWeatherByLocationAndDate 呼叫失敗:', err)
-        } finally {
-            setLoading(false)
+      const resp = await fetch(`${apiBase}/weatherforecast/GetWeatherForecastWithHeaders`, {
+        method: 'GET',
+        headers: {
+          'Location': location.trim(),
+          'StartDate': startDate,
+          'Accept': 'text/plain'
         }
+      })
+
+      if (!resp.ok) {
+        throw new Error(`請求失敗：${resp.status} ${resp.statusText}`)
+      }
+
+      const headerVal = resp.headers.get('X-Weather-Forecasts')
+      if (!headerVal) {
+        throw new Error('找不到回應標頭 X-Weather-Forecasts。請確認伺服器已設定 CORS Expose-Headers。')
+      }
+
+      const raw = JSON.parse(headerVal) as any[]
+
+      const normalized: WeatherForecast[] = raw.map((x: any) => ({
+        date: x.Date ?? x.date,
+        temperatureC: x.TemperatureC ?? x.temperatureC,
+        summary: x.Summary ?? x.summary,
+        temperatureF: x.TemperatureF ?? x.temperatureF
+      }))
+
+      setForecasts(normalized)
+    } catch (e: any) {
+      setError(e?.message ?? String(e))
+    } finally {
+      setLoading(false)
     }
+  }
 
-    return (
-        <>
-            <div>
-                <a href="https://vite.dev" target="_blank">
-                    <img src={viteLogo} className="logo" alt="Vite logo" />
-                </a>
-                <a href="https://react.dev" target="_blank">
-                    <img src={reactLogo} className="logo react" alt="React logo" />
-                </a>
-            </div>
-            <h1>Vite + React</h1>
-            <div className="card">
-                <button onClick={() => setCount((count) => count + 1)}>
-                    count is {count}
-                </button>
-                <p>
-                    Edit <code>src/App.tsx</code> and save to test HMR
-                </p>
-            </div>
+  return (
+    <>
+      <div>
+        <a href="https://vite.dev" target="_blank">
+          <img src={viteLogo} className="logo" alt="Vite logo" />
+        </a>
+        <a href="https://react.dev" target="_blank">
+          <img src={reactLogo} className="logo react" alt="React logo" />
+        </a>
+      </div>
 
-            {/* 自訂查詢天氣預報 */}
-            <div className="card" style={{ marginTop: '20px', width: '100%', maxWidth: 800 }}>
-                <h2>查詢指定地點與日期的天氣預報</h2>
+      <h1>Vite + React</h1>
 
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label htmlFor="location">地點</label>
-                        <input
-                            id="location"
-                            type="text"
-                            value={location}
-                            onChange={e => setLocation(e.target.value)}
-                            placeholder="輸入地點"
-                            style={{ padding: '6px 8px' }}
-                        />
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                        <label htmlFor="date">日期 (YYYY-MM-DD)</label>
-                        <input
-                            id="date"
-                            type="date"
-                            value={date}
-                            onChange={e => setDate(e.target.value)}
-                            style={{ padding: '6px 8px' }}
-                        />
-                    </div>
-                    <div style={{ alignSelf: 'flex-end' }}>
-                        <button
-                            onClick={fetchWeatherByLocationAndDate}
-                            disabled={loading || !location.trim() || !/^\d{4}-\d{2}-\d{2}$/.test(date)}
-                            style={{ padding: '8px 14px' }}
-                        >
-                            {loading ? '查詢中...' : '取得天氣'}
-                        </button>
-                    </div>
-                </div>
+      <div className="card" style={{ display: 'grid', gap: 12 }}>
+        <div>
+          <button onClick={() => setCount((count) => count + 1)}>
+            count is {count}
+          </button>
+        </div>
 
-                {error && <p style={{ color: 'red' }}>{error}</p>}
+        <hr />
 
-                {forecasts.length > 0 && (
-                    <div style={{ marginTop: '12px', overflowX: 'auto' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 600 }}>
-                            <thead>
-                                <tr>
-                                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>日期</th>
-                                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>地點</th>
-                                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>溫度 (C)</th>
-                                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>溫度 (F)</th>
-                                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>概況</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {forecasts.map((forecast, index) => (
-                                    <tr key={index}>
-                                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>{forecast.date}</td>
-                                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>{forecast.location}</td>
-                                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>{forecast.temperatureC}</td>
-                                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>{forecast.temperatureF}</td>
-                                        <td style={{ border: '1px solid #ddd', padding: '8px' }}>{forecast.summary}</td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                )}
+        <h2>天氣查詢（Header 傳遞）</h2>
 
-                {forecasts.length === 0 && !loading && !error && (
-                    <p style={{ marginTop: '8px', color: '#666' }}>請輸入地點與日期後點擊「取得天氣」。</p>
-                )}
-            </div>
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span>地點</span>
+          <input
+            type="text"
+            placeholder="例如：Kaohsiung"
+            value={location}
+            onChange={(e) => setLocation(e.target.value)}
+          />
+        </label>
 
-            <p className="read-the-docs">
-                Click on the Vite and React logos to learn more
-            </p>
-        </>
-    )
+        <label style={{ display: 'grid', gap: 6 }}>
+          <span>開始日期</span>
+          <input
+            type="date"
+            value={startDate}
+            onChange={(e) => setStartDate(e.target.value)}
+          />
+        </label>
+
+        <div>
+          <button onClick={fetchForecasts} disabled={loading}>
+            {loading ? '查詢中…' : '送出並取得預報'}
+          </button>
+        </div>
+
+        {error && (
+          <div style={{ color: 'crimson' }}>
+            {error}
+          </div>
+        )}
+
+        {forecasts.length > 0 && (
+          <div>
+            <h3>預報結果</h3>
+            <ul>
+              {forecasts.map((f) => (
+                <li key={`${f.date}-${f.summary}`}>
+                  <strong>{f.date}</strong> — {f.summary}，{f.temperatureC} °C{typeof f.temperatureF === 'number' ? `（${f.temperatureF} °F）` : ''}
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      <p className="read-the-docs">
+        Click on the Vite and React logos to learn more
+      </p>
+    </>
+  )
 }
 
 export default App
 ```
 
-
 在這個 [App.tsx] 的程式碼中，定義了一個 `WeatherForecast` 的 TypeScript 介面，來對應後端 API 回傳的資料結構。接著，使用 React 的 `useState` Hook 來管理天氣預報資料、載入狀態和錯誤訊息。
 
-這裡設定 [apiBase] 變數為後端 API 的基本 URL，這樣在呼叫 API 的時候就可以使用這個變數來組合完整的 API 端點 URL。另外，使用了 const response = await fetch(`${apiBase}/weatherforecast/GetWeatherByLocationAndDate/${location.trim()}/${date}`) 來呼叫後端的 API 端點，並且將地點與日期作為路由參數傳送給後端。
+這裡設定 [apiBase] 變數為後端 API 的基本 URL，這樣在呼叫 API 的時候就可以使用這個變數來組合完整的 API 端點 URL。另外，使用了 const resp = await fetch(`${apiBase}/weatherforecast/GetWeatherForecastWithHeaders` 的方式來呼叫後端的 API 端點，並且將地點與日期作為 Header 參數傳送給後端。
 
-另外，定義了一個 `fetchWeatherForecast` 的非同步函數，來呼叫後端的 API 端點，並將回傳的資料存到 `forecasts` 的狀態中。如果在呼叫 API 的過程中發生錯誤，會將錯誤訊息存到 `error` 的狀態中。在 JSX 的部分，建立了一個按鈕，當使用者點擊時會呼叫 `fetchWeatherForecast` 函數來獲取天氣預報資料。當資料成功獲取後，會將資料以表格的形式顯示在畫面上。如果在獲取資料的過程中發生錯誤，我們會在畫面上顯示錯誤訊息。
+另外，定義了一個 `fetchForecasts` 的非同步函數，來呼叫後端的 API 端點，並將回傳的資料存到 `forecasts` 的狀態中。如果在呼叫 API 的過程中發生錯誤，會將錯誤訊息存到 `error` 的狀態中。在 JSX 的部分，建立了一個按鈕，當使用者點擊時會呼叫 `fetchForecasts` 函數來獲取天氣預報資料。當資料成功獲取後，會將資料以列表的形式顯示在畫面上。如果在獲取資料的過程中發生錯誤，我們會在畫面上顯示錯誤訊息。
 
-另外，對於使用者要輸入的欄位，這裡使用了兩個 `useState` 來分別管理地點與日期的值，並且在按鈕被點擊時，將這些值作為查詢字串參數傳送給後端的 API 端點。接著，也做了輸入防呆檢查，確保地點不可為空，日期的格式必須為 YYYY-MM-DD，只有在這些條件都滿足的情況下，按鈕才會被啟用。
+對於這個敘述 const headerVal = resp.headers.get('X-Weather-Forecasts') 的部分，這裡是從 HTTP 回應的 Header 中，取得名為 [X-Weather-Forecasts] 的自訂標頭的值，這個標頭是後端 API 端點在處理完請求後，將天氣預報資料序列化為 JSON 字串後，放到這個標頭上回傳給前端的。接著，我們會將這個 JSON 字串解析回 JavaScript 物件，並且將它存到 `forecasts` 的狀態中，以便在畫面上渲染出來。
 
 ## 設定同時啟動多個專案
 * 在這個方案內，擁有兩個專案，分別是 [WebApiDemo] 與 [reactdemo]
@@ -287,7 +280,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins("http://localhost:49158") // React 應用運行在此端口
                 .AllowAnyHeader()
-                .AllowAnyMethod();
+                .AllowAnyMethod()
+                ;
     });
 });
 ```
@@ -309,12 +303,27 @@ app.UseCors("AllowReactApp");
 
 * 按下 F5 鍵或點擊「開始」按鈕來執行程式
 * 此時，會出現 React 設計的網頁，如下圖所示
-![](../Images/cs2025-879.png)
+![](../Images/cs2025-877.png)
 * 在網頁最下方，可以看到兩個要輸入的欄位
 * 地點與日期，請隨意輸入任何值到這兩個欄位中
 * 例如，地點輸入「Taipei」，日期輸入「2024-06-01」
-* 然後點擊 [取得天氣] 的按鈕
-* 此時，React 的前端應用程式會呼叫後端的 API 端點，並將地點與日期作為查詢字串參數傳送給後端
+* 然後點擊 [送出並取得預報] 的按鈕
+* 此時，React 的前端應用程式會呼叫後端的 API 端點，並將地點與日期作為 Header 參數傳送給後端
 * 後端的 API 端點會根據接收到的地點與日期來產生對應的天氣預報資料，並將這些資料以 JSON 格式回傳給前端
-* 前端接收到這些資料後，會將它們渲染到網頁上，以表格的形式顯示出來
-![](../Images/cs2025-878.png)
+* 理論上，前端接收到這些資料後，會將它們渲染到網頁上，以表格的形式顯示出來
+* 可是，因為前面的程式碼有問題，導致網頁上出現了錯誤訊息，提示 [找不到回應標頭 X-Weather-Forecasts。請確認伺服器已設定 CORS Expose-Headers。]
+![](../Images/cs2025-876.png)
+* 這個錯誤訊息表示了，前端的 React 應用程式無法從 HTTP 回應的 Header 中，取得名為 [X-Weather-Forecasts] 的自訂標頭的值，這是因為 CORS 的政策限制，導致前端無法存取這個標頭
+* 為了修正這個問題，我們需要在後端的 ASP.NET Core Web API 專案中，設定 CORS 的 Expose-Headers，來允許前端存取 [X-Weather-Forecasts] 這個自訂標頭
+* 打開 [Program.cs] 檔案
+* 找到 `.AllowAnyMethod()` 這一行
+* 在這一行的下方，加入底下的程式碼，來設定 CORS 的 Expose-Headers，允許前端存取 [X-Weather-Forecasts] 這個自訂標頭
+
+```csharp
+.WithExposedHeaders("X-Weather-Forecasts")
+```
+* 這裡使用了 `WithExposedHeaders` 方法來設定 CORS 的 Expose-Headers，並指定允許前端存取 [X-Weather-Forecasts] 這個自訂標頭
+* 儲存 [Program.cs] 的修改
+* 再次按下 F5 鍵或點擊「開始」按鈕來執行程式
+* 現在，當你在 React 的前端應用程式中輸入地點與日期，並且點擊 [送出並取得預報] 的按鈕後，應該就可以成功從後端的 API 端點獲取到天氣預報資料，並且將它們渲染到網頁上了
+![](../Images/cs2025-875.png)
