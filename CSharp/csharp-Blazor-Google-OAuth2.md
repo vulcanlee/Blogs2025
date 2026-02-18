@@ -1,6 +1,6 @@
-# Blazor 使用 Google OAuth 2.0
+# React 使用 Google OAuth 2.0
 
-在這篇文章中，我們將會建立一個 Blazor Web 應用程式，並且使用 Google OAuth 2.0 來實現使用者的登入功能。這樣使用者就可以使用他們的 Google 帳號來登入我們的應用程式，並且在登入後看到一些受保護的內容。
+在這篇文章中，我們將會建立一個 React Web 應用程式，並且使用 Google OAuth 2.0 來實現使用者的登入功能。這樣使用者就可以使用他們的 Google 帳號來登入我們的應用程式，並且在登入後看到一些受保護的內容。
 
 ## 建立 Blazor 專案
 * 開啟 Visual Studio 2026
@@ -128,6 +128,8 @@ public class ConfigurationService
     public string ClientSecret { get; set; } = "";
 }
 ```
+
+這裡的服務將會提供兩個字串，分別用於存儲 Google OAuth 2.0 的 Client ID 和 Client Secret，這些值是從 Google API Console 中獲取的，並且在後續的程式碼中會使用這些值來設定 Google 驗證的相關選項。
 
 ## 修正 OAuth2 需要用到的程式碼
 * 從專案跟目錄下，找到並打開 [Program.cs] 檔案
