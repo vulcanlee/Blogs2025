@@ -23,18 +23,22 @@
 * 如此，將會下載 10 個模擬病人資料集，這些資料集以 ndjson 格式存儲，並且包含了 FHIR 資源的完整結構，可以用來測試和開發 FHIR API 的功能。
 * 打開並且解壓縮這個 [sample-bulk-fhir-datasets-10-patients.zip] 檔案
 * 這個檔案內將會有底下的FHIR資源檔案：
-  * AllergyIntolerance ： 這個資源將會是包含病人過敏反應資料的 FHIR AllergyIntolerance 資源。
-  * Condition ：這個資源將會是包含病人診斷資料的 FHIR Condition 資源。
-  * Device ：這個資源將會是包含病人醫療設備資料的 FHIR Device 資源。
-  * DiagnosticReport ：這個資源將會是包含病人診斷報告資料的 FHIR DiagnosticReport 資源。
-  * DocumentReference ：這個資源將會是包含病人文件參考資料的 FHIR DocumentReference 資源。
-  * Encounter ：這個資源將會是包含病人就診事件資料的 FHIR Encounter 資源。
-  * Immunization ：這個資源將會是包含病人免疫接種資料的 FHIR Immunization 資源。
-  * Medication ：這個資源將會是包含病人用藥資料的 FHIR Medication 資源。
-  * MedicationRequest ：這個資源將會是包含病人用藥請求資料的 FHIR MedicationRequest 資源。
-  * Observation ：這個資源將會是包含病人觀察資料的 FHIR Observation 資源。
-  * Patient ：這個資源將會是包含病人基本資訊的 FHIR Patient 資源。
-  * Procedure ：這個資源將會是包含病人醫療程序資料的 FHIR Procedure 資源。
+   *Organization ： 模擬的醫療機構資料。
+   *Location ： 模擬的醫療機構地點資料。
+   *Practitioner ： 模擬的醫療人員資料。
+   *PractitionerRole ： 模擬的醫療人員角色資料。
+   *Patient ： 模擬的病人資料。
+   *Encounter ： 模擬的就診事件資料。
+   *Condition ： 模擬的疾病或健康狀態資料。
+   *AllergyIntolerance ： 模擬的過敏或不耐受資料。
+   *Immunization ： 模擬的疫苗接種資料。
+   *Device ： 模擬的醫療設備資料。
+   *Observation ： 模擬的觀察資料。
+   *Procedure ： 模擬的醫療程序資料。
+   *DiagnosticReport ： 模擬的診斷報告資料。
+   *DocumentReference ： 模擬的文件參考資料。
+   *MedicationRequest ： 模擬的用藥請求資料。
+
 * 在這個目錄下，建立一個 PowerShell 檔案 [import.ps1]
 * 在這個檔案內輸入底下的程式碼：
 
@@ -46,7 +50,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# 判斷物件是否「有內容」（不是空物件/空陣列/空字串/null）
+# 判斷物件是否「有內容」（"不是空物件/空陣列/空字串/null）
 function Test-HasContent {
   param($Value)
 
@@ -211,20 +215,20 @@ function Import-NdjsonFile {
 
 # 匯入順序（先被參考者）
 $order = @(
-  "Organization*.ndjson",
-  "Location*.ndjson",
-  "Practitioner*.ndjson",
-  "PractitionerRole*.ndjson",
-  "Patient*.ndjson",
-  "Encounter*.ndjson",
-  "Condition*.ndjson",
-  "AllergyIntolerance*.ndjson",
-  "Immunization*.ndjson",
-  "Device*.ndjson",
-  "Observation*.ndjson",
-  "Procedure*.ndjson",
-  "DiagnosticReport*.ndjson",
-  "DocumentReference*.ndjson",
+  "Organization
+  "Location
+  "Practitioner
+  "PractitionerRole
+  "Patient
+  "Encounter
+  "Condition
+  "AllergyIntolerance
+  "Immunization
+  "Device
+  "Observation
+  "Procedure
+  "DiagnosticReport
+  "DocumentReference
   "MedicationRequest*.ndjson"
 )
 
