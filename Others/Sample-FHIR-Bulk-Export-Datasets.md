@@ -23,21 +23,21 @@
 * 如此，將會下載 10 個模擬病人資料集，這些資料集以 ndjson 格式存儲，並且包含了 FHIR 資源的完整結構，可以用來測試和開發 FHIR API 的功能。
 * 打開並且解壓縮這個 [sample-bulk-fhir-datasets-10-patients.zip] 檔案
 * 這個檔案內將會有底下的FHIR資源檔案：
-   *Organization ： 模擬的醫療機構資料。
-   *Location ： 模擬的醫療機構地點資料。
-   *Practitioner ： 模擬的醫療人員資料。
-   *PractitionerRole ： 模擬的醫療人員角色資料。
-   *Patient ： 模擬的病人資料。
-   *Encounter ： 模擬的就診事件資料。
-   *Condition ： 模擬的疾病或健康狀態資料。
-   *AllergyIntolerance ： 模擬的過敏或不耐受資料。
-   *Immunization ： 模擬的疫苗接種資料。
-   *Device ： 模擬的醫療設備資料。
-   *Observation ： 模擬的觀察資料。
-   *Procedure ： 模擬的醫療程序資料。
-   *DiagnosticReport ： 模擬的診斷報告資料。
-   *DocumentReference ： 模擬的文件參考資料。
-   *MedicationRequest ： 模擬的用藥請求資料。
+   * Organization ： 模擬的醫療機構資料。
+   * Location ： 模擬的醫療機構地點資料。
+   * Practitioner ： 模擬的醫療人員資料。
+   * PractitionerRole ： 模擬的醫療人員角色資料。
+   * Patient ： 模擬的病人資料。
+   * Encounter ： 模擬的就診事件資料。
+   * Condition ： 模擬的疾病或健康狀態資料。
+   * AllergyIntolerance ： 模擬的過敏或不耐受資料。
+   * Immunization ： 模擬的疫苗接種資料。
+   * Device ： 模擬的醫療設備資料。
+   * Observation ： 模擬的觀察資料。
+   * Procedure ： 模擬的醫療程序資料。
+   * DiagnosticReport ： 模擬的診斷報告資料。
+   * DocumentReference ： 模擬的文件參考資料。
+   * MedicationRequest ： 模擬的用藥請求資料。
 
 * 在這個目錄下，建立一個 PowerShell 檔案 [import.ps1]
 * 在這個檔案內輸入底下的程式碼：
