@@ -228,6 +228,25 @@ public class Program
 * 在 catch 區塊中，捕獲了任何異常，並使用 NLog 記錄了一條錯誤級別的日誌，包含了異常信息 `LogManager.GetCurrentClassLogger().Error(ex, "Stopped program because of an exception");`，這樣就可以在日誌中看到應用程式因為異常而停止的消息以及異常的詳細信息。
 * 在 finally 區塊中，調用了 `LogManager.Shutdown();`，這樣可以確保 NLog 的資源能夠正確釋放，並且在應用程式結束時能夠完成所有的日誌記錄操作。
 
+## 修正 appsettings.json 檔案
+* 在專案根目錄下，找到 [appsettings.json] 檔案並打開它
+* 在這個檔案中，將原有的內容全，使用底下程式碼取代：
+
+```json
+{
+    "Logging": {
+        "LogLevel": {
+            "Default": "Information",
+            "Microsoft.AspNetCore": "Warning"
+        }
+    },
+    "AllowedHosts": "*",
+    "NLog": {
+        "BasePath": "D:\\Logs"
+    }
+}
+```
+
 ## 修正 Counter 元件
 * 在專案根目錄下，滑鼠右擊 [Components] > [Pages] 資料夾
 * 從右鍵選單中，選擇 [加入] > [新增項目]
